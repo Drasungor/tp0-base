@@ -1,4 +1,3 @@
-from msilib.schema import Error
 import sys
 
 def write_file_beginning(docker_compose_file):
@@ -17,16 +16,16 @@ services:
       - testing_net""")
 
 def write_file_clients(docker_compose_file, number_of_clients):
-    if (number_of_clients < 1):
-        raise Exception("The file needs 1 or more clients")
-    for i in range(number_of_clients + 1):
+    for i in range(number_of_clients):
+        client_number = i + 1
         docker_compose_file.write(f"""
-  client1:
-    container_name: client{i}
+
+  client{client_number}:
+    container_name: client{client_number}
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_ID={i}
+      - CLI_ID={client_number}
       - CLI_SERVER_ADDRESS=server:12345
       - CLI_LOOP_LAPSE=1m2s
       - CLI_LOG_LEVEL=DEBUG
@@ -37,6 +36,7 @@ def write_file_clients(docker_compose_file, number_of_clients):
 
 def write_file_end(docker_compose_file):
     docker_compose_file.write("""
+
 networks:
   testing_net:
     ipam:
@@ -55,6 +55,9 @@ def main():
     args_amounts = len(argv)
     if (args_amounts != 2):
         raise Exception("Command line arguments should have the amount of clients as it's only argument")
-    write_file(args_amounts[2])
+    number_of_clients = int(argv[1])
+    if (number_of_clients < 1):
+        raise Exception("The file needs 1 or more clients")
+    write_file(number_of_clients)
 
 main()
