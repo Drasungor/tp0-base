@@ -12,7 +12,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./server:/build
+      - ./server/config.ini:/config.ini
 
   client1:
     container_name: client1
@@ -26,7 +26,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./client:/build
+      - ./client/config.yaml:/config.yaml
     depends_on:
       - server
 
