@@ -1,6 +1,7 @@
 import socket
 import logging
 import signal
+import sys
 # import time
 
 class ConnectionStatus:
@@ -15,8 +16,10 @@ class ConnectionStatus:
         self.current_connection = None
 
     def close_connection(self, *args):
-        self.current_connection.close()
-        logging.info("Closed dangling socket connection")
+        if (not (self.current_connection is None)):
+            self.current_connection.close()
+            logging.info("Closed dangling socket connection")
+            sys.exit(143)
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -61,6 +64,8 @@ class Server:
             # time.sleep(10)
             client_sock.close()
             self.connection_status.delete_connection()
+            # logging.info("Wait after socket closure and deletion")
+            # time.sleep(10)
 
     def __accept_new_connection(self):
         """
