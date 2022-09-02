@@ -6,9 +6,9 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-      - SERVER_PORT=12345
+      # - SERVER_PORT=12345
       - SERVER_LISTEN_BACKLOG=7
-      - LOGGING_LEVEL=DEBUG
+      # - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
     volumes:
@@ -20,9 +20,9 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID=1
-      - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
-      - CLI_LOG_LEVEL=DEBUG
+      # - CLI_SERVER_ADDRESS=server:12345
+      # - CLI_LOOP_LAPSE=1m2s
+      # - CLI_LOG_LEVEL=DEBUG
     networks:
       - testing_net
     volumes:
