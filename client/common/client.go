@@ -49,12 +49,11 @@ func (c *Client) createClientSocket() error {
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
+func (c *Client) StartClientLoop(ch chan bool) {
 	// Create the connection the server in every loop iteration. Send an
 	// autoincremental msgID to identify every message sent
 	c.createClientSocket()
 	msgID := 1
-
 loop:
 	// Send messages if the loopLapse threshold has been not surpassed
 	for timeout := time.After(c.config.LoopLapse); ; {

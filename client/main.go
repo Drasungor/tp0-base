@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"os"
+    "os/signal"
+    "syscall"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -102,5 +105,13 @@ func main() {
 	}
 
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+
+	signal_channel := make(chan os.Signal, 1)
+	signal.Notify(signal_channel, syscall.SIGTERM)
+	thread_communication_channel := make(chan bool, 1)
+
+	go client.StartClientLoop(thread_communication_channel)
+	<- signal_channel
+	thread_communication_channel <- true
+	<- thread_communication_channel
 }

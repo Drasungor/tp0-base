@@ -5,8 +5,9 @@ import sys
 # import time
 
 class ConnectionStatus:
-    def __init__(self):
+    def __init__(self, server_socket):
         self.current_connection = None
+        self._server_socket = server_socket
         signal.signal(signal.SIGTERM, self.close_connection)
     
     def add_connection(self, socket):
@@ -16,10 +17,12 @@ class ConnectionStatus:
         self.current_connection = None
 
     def close_connection(self, *args):
+        self._server_socket.close()
+        logging.info("Closed server socket")
         if (not (self.current_connection is None)):
             self.current_connection.close()
             logging.info("Closed dangling socket connection")
-            sys.exit(143)
+        sys.exit(143)
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -27,7 +30,7 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self.connection_status = ConnectionStatus()
+        self.connection_status = ConnectionStatus(self._server_socket)
 
     def run(self):
         """
