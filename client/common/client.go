@@ -90,20 +90,21 @@ loop:
 		}
 		log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
 
+		
+		// Wait a time between sending one message and the next one
+		time.Sleep(c.config.LoopPeriod)
+		
+		// Recreate connection to the server
+		c.conn.Close()
+		
 		// Process SIGTERM
 		select {
 		case <-signal_channel:
-			c.conn.Close()
-			log.Infof("SIGTERM received, closing dangling connection")
+			log.Infof("SIGTERM received")
 			os.Exit(143)
 		default:
 		}
 
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
-
-		// Recreate connection to the server
-		c.conn.Close()
 		c.createClientSocket()
 	}
 
