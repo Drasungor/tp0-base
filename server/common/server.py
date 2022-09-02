@@ -18,6 +18,7 @@ class ConnectionStatus:
 
     def close_connection(self, *args):
         self._server_socket.close()
+        logging.info("SIGTERM received")
         logging.info("Closed server socket")
         if (not (self.current_connection is None)):
             self.current_connection.close()
