@@ -1,21 +1,22 @@
 import socket
 import logging
 import signal
+# import time
 
 class ConnectionStatus:
     def __init__(self):
-        self.opened_connections = {}
-        signal.signal(signal.SIGTERM, self.close_all_connections)
+        self.current_connection = None
+        signal.signal(signal.SIGTERM, self.close_connection)
     
-    def add_connection(self, address, socket):
-        self.opened_connections[address] = socket
-    
-    def delete_connection(self, address):
-        del self.opened_connections[address]
+    def add_connection(self, socket):
+        self.current_connection = socket
 
-    def close_all_connections(self):
-        for address in self.opened_connections:
-            self.opened_connections[address].close()
+    def delete_connection(self):
+        self.current_connection = None
+
+    def close_connection(self, *args):
+        self.current_connection.close()
+        logging.info("Closed dangling socket connection")
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -23,7 +24,7 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self.connections_status = ConnectionsStatus()
+        self.connection_status = ConnectionStatus()
 
     def run(self):
         """
@@ -56,7 +57,10 @@ class Server:
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
         finally:
+            # logging.info("Wait before socket closure")
+            # time.sleep(10)
             client_sock.close()
+            self.connection_status.delete_connection()
 
     def __accept_new_connection(self):
         """
@@ -69,6 +73,6 @@ class Server:
         # Connection arrived
         logging.info("Proceed to accept new connections")
         c, addr = self._server_socket.accept()
-        self.connections_status.add_connection(addr, c)
+        self.connection_status.add_connection(c)
         logging.info('Got connection from {}'.format(addr))
         return c
