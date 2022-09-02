@@ -1,6 +1,21 @@
 import socket
 import logging
+import signal
 
+class ConnectionStatus:
+    def __init__(self):
+        self.opened_connections = {}
+        signal.signal(signal.SIGTERM, self.close_all_connections)
+    
+    def add_connection(self, address, socket):
+        self.opened_connections[address] = socket
+    
+    def delete_connection(self, address):
+        del self.opened_connections[address]
+
+    def close_all_connections(self):
+        for address in self.opened_connections:
+            self.opened_connections[address].close()
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -8,6 +23,7 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+        self.connections_status = ConnectionsStatus()
 
     def run(self):
         """
@@ -53,5 +69,6 @@ class Server:
         # Connection arrived
         logging.info("Proceed to accept new connections")
         c, addr = self._server_socket.accept()
+        self.connections_status.add_connection(addr, c)
         logging.info('Got connection from {}'.format(addr))
         return c
