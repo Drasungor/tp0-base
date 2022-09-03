@@ -58,3 +58,6 @@ class ClientSocket:
 		document = self.__read_string()
 		birthdate = self.__read_string()
 		return Contestant(first_name, last_name, document, birthdate)
+
+	def close(self):
+		self.socket.close()

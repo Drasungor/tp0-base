@@ -4,6 +4,8 @@ import signal
 import sys
 # import time
 
+from server.common.utils import ClientSocket, is_winner
+
 class ConnectionStatus:
     def __init__(self, server_socket):
         self.current_connection = None
@@ -56,20 +58,13 @@ class Server:
         client socket will also be closed
         """
         try:
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            logging.info(
-                'Message received from connection {}. Msg: {}'
-                .format(client_sock.getpeername(), msg))
-            client_sock.send("Your Message has been received: {}\n".format(msg).encode('utf-8'))
+            contestant = client_sock.recv_contestant()
+            client_sock.send_lottery_result(is_winner(contestant))
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
         finally:
-            # logging.info("Wait before socket closure")
-            # time.sleep(10)
             client_sock.close()
             self.connection_status.delete_connection()
-            # logging.info("Wait after socket closure and deletion")
-            # time.sleep(10)
 
     def __accept_new_connection(self):
         """
@@ -84,4 +79,4 @@ class Server:
         c, addr = self._server_socket.accept()
         self.connection_status.add_connection(c)
         logging.info('Got connection from {}'.format(addr))
-        return c
+        return ClientSocket(c)
