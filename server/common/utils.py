@@ -36,11 +36,14 @@ class ClientSocket:
 	def __init__(self, socket):
 		self.socket = socket
 
-	def send_lottery_result(self, user_won: bool):
-		number_to_send = 0
-		if (user_won):
-			number_to_send = 1
-		self.socket.send_all(number_to_send.to_bytes(1))
+	def __send_normal_message_code(self):
+		self.socket.send_all(constants.normal_message_code.to_bytes(constants.normal_message_code))
+
+	def __send_error_message_code(self):
+		self.socket.send_all(constants.normal_message_code.to_bytes(constants.error_message_code))
+
+	def __read_message_code(self):
+		return int.from_bytes(self.__recv_all(constants.message_type_code_bytes_amount), "big")
 
 	def __recv_all(self, bytes_amount):
 		received_bytes = b''
@@ -49,15 +52,34 @@ class ClientSocket:
 		return received_bytes
 
 	def __read_string(self):
-		string_length = int.from_bytes(self.__recv_all(constants.attributes_length), "big")
+		string_length = int.from_bytes(self.__recv_all(constants.attributes_length_bytes_amount), "big")
 		return self.__recv_all(string_length).decode()
 
+	def __send_string(self, message: str):
+		string_bytes = bytes(message)
+		self.socket.send_all(len(string_bytes).to_bytes(constants.attributes_length_bytes_amount))
+		self.socket.send_all(string_bytes)
+
+	def send_lottery_result(self, user_won: bool):
+		number_to_send = 0
+		if (user_won):
+			number_to_send = 1
+		self.__send_normal_message_code()
+		self.socket.send_all(number_to_send.to_bytes(constants.bool_bytes_amount))
+
+
 	def recv_contestant(self) -> Contestant:
+		if (self.__read_message_code() != constants.normal_message_code):
+			raise Exception(f"Error received: {self.__read_string()}")
 		first_name = self.__read_string()
 		last_name = self.__read_string()
 		document = self.__read_string()
 		birthdate = self.__read_string()
 		return Contestant(first_name, last_name, document, birthdate)
+
+	def send_error_message(self, message: str):
+		self.__send_error_message_code()
+		self.__send_string(message)
 
 	def close(self):
 		self.socket.close()
