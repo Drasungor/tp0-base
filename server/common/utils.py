@@ -83,3 +83,10 @@ class ClientSocket:
 
 	def close(self):
 		self.socket.close()
+
+# Protocol:
+
+# message_type_code: 0 (normal code) or 1 (error code), 1 byte
+
+# if error code: 4 bytes big endian number depicting message length, followed by that number of string bytes encoded in utf8
+# if normal code: message that has to be sent depending on the conversation that is being had at the moment
