@@ -21,6 +21,10 @@ services:
       - CLI_SERVER_ADDRESS=server:12345
       - CLI_LOOP_LAPSE=1m2s
       - CLI_LOG_LEVEL=DEBUG
+      - CLI_FIRST_NAME=Oscar
+      - CLI_LAST_NAME=Paez
+      - CLI_DOCUMENT=123456789
+      - CLO_BIRTHDATE=2008-04-25
     networks:
       - testing_net
     depends_on:

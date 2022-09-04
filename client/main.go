@@ -35,6 +35,10 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
+	v.BindEnv("first", "name")
+	v.BindEnv("last", "name")
+	v.BindEnv("document")
+	v.BindEnv("birthdate")
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -99,8 +103,14 @@ func main() {
 		ID:            v.GetString("id"),
 		LoopLapse:     v.GetDuration("loop.lapse"),
 		LoopPeriod:    v.GetDuration("loop.period"),
+		FirstName:     v.GetString("first.name"),
+		LastName:	   v.GetString("last.name"),
+		Document:      v.GetString("document"),
+		Birthdate:     v.GetString("birthdate"),
 	}
 
 	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
+
+
 }
