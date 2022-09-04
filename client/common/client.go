@@ -47,7 +47,7 @@ func closeParticipantsManager(client *Client) error {
 			err,
 		)
 	}
-	log.Infof("[CLIENT %v] Closed socket connection", c.config.ID)
+	log.Infof("[CLIENT %v] Closed socket connection", client.config.ID)
 	return err
 }
 
@@ -102,14 +102,16 @@ func (c *Client) StartClientLoop() {
 	result, is_app_error, error_message := c.manager.ReceiveParticipantResult()
 	if is_app_error {
 		log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
+		return
 	} else if error_message != nil {
 		log.Fatal("[CLIENT %v] ")
 		logErrorMessage(c.config.ID, error_message)
+		return
 	}
 	if result {
-		log.Infof("[CLIENT %v] Participant has won the lottery")
+		log.Infof("[CLIENT %v] Participant has won the lottery", c.config.ID)
 	} else {
-		log.Infof("[CLIENT %v] Participant did not win the lottery")
+		log.Infof("[CLIENT %v] Participant did not win the lottery", c.config.ID)
 	}
 	// Process SIGTERM
 	select {

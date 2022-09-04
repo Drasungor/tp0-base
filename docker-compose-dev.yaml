@@ -24,7 +24,7 @@ services:
       - CLI_FIRST_NAME=Oscar
       - CLI_LAST_NAME=Paez
       - CLI_DOCUMENT=123456789
-      - CLO_BIRTHDATE=2008-04-25
+      - CLI_BIRTHDATE=2008-04-25
     networks:
       - testing_net
     depends_on:

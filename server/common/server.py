@@ -4,7 +4,7 @@ import signal
 import sys
 # import time
 
-from server.common.utils import ClientSocket, is_winner
+from common.utils import ClientSocket, is_winner
 
 class ConnectionStatus:
     def __init__(self, server_socket):
@@ -63,7 +63,7 @@ class Server:
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
         except Exception as e:
-            logging.info("Error: {e}".format(e))
+            logging.info("Error: {}".format(str(e)))
             client_sock.send_error_message(str(e))
         finally:
             client_sock.close()

@@ -1,6 +1,7 @@
+import socket
 import time
 import datetime
-import constants
+import common.constants as constants
 
 """ Winners storage location. """
 STORAGE = "./winners"
@@ -33,22 +34,22 @@ def persist_winners(winners: list[Contestant]) -> None:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
 
 class ClientSocket:
-	def __init__(self, socket):
+	def __init__(self, socket: socket):
 		self.socket = socket
 
 	def __send_normal_message_code(self):
-		self.socket.send_all(constants.normal_message_code.to_bytes(constants.normal_message_code))
+		self.socket.sendall(constants.normal_message_code.to_bytes(constants.message_code_bytes_amount, "big"))
 
 	def __send_error_message_code(self):
-		self.socket.send_all(constants.normal_message_code.to_bytes(constants.error_message_code))
+		self.socket.sendall(constants.error_message_code.to_bytes(constants.message_code_bytes_amount, "big"))
 
 	def __read_message_code(self):
 		return int.from_bytes(self.__recv_all(constants.message_type_code_bytes_amount), "big")
 
-	def __recv_all(self, bytes_amount):
+	def __recv_all(self, bytes_amount: int):
 		received_bytes = b''
 		while (len(received_bytes) < bytes_amount):
-			received_bytes.join(self.socket.recv(bytes_amount - len(received_bytes)))
+			received_bytes = self.socket.recv(bytes_amount - len(received_bytes))
 		return received_bytes
 
 	def __read_string(self):
@@ -56,16 +57,16 @@ class ClientSocket:
 		return self.__recv_all(string_length).decode()
 
 	def __send_string(self, message: str):
-		string_bytes = bytes(message)
-		self.socket.send_all(len(string_bytes).to_bytes(constants.attributes_length_bytes_amount))
-		self.socket.send_all(string_bytes)
+		string_bytes = bytes(message, "utf8")
+		self.socket.sendall(len(string_bytes).to_bytes(constants.attributes_length_bytes_amount, "big"))
+		self.socket.sendall(string_bytes)
 
 	def send_lottery_result(self, user_won: bool):
 		number_to_send = 0
 		if (user_won):
 			number_to_send = 1
 		self.__send_normal_message_code()
-		self.socket.send_all(number_to_send.to_bytes(constants.bool_bytes_amount))
+		self.socket.sendall(number_to_send.to_bytes(constants.bool_bytes_amount, "big"))
 
 
 	def recv_contestant(self) -> Contestant:

@@ -83,6 +83,10 @@ func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Loop Lapse: %v", v.GetDuration("loop.lapse"))
 	logrus.Infof("Loop Period: %v", v.GetDuration("loop.period"))
 	logrus.Infof("Log Level: %s", v.GetString("log.level"))
+	logrus.Infof("First name: %s", v.GetString("first.name"))
+	logrus.Infof("Last name: %s", v.GetString("last.name"))
+	logrus.Infof("Document: %s", v.GetString("document"))
+	logrus.Infof("Birthdate: %s", v.GetString("birthdate"))
 }
 
 func main() {
