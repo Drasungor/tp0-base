@@ -50,7 +50,7 @@ class Server:
             client_sock = self.__accept_new_connection()
             self.__handle_client_connection(client_sock)
 
-    def __handle_client_connection(self, client_sock):
+    def __handle_client_connection(self, client_sock: ClientSocket):
         """
         Read message from a specific client socket and closes the socket
 
@@ -62,11 +62,14 @@ class Server:
             client_sock.send_lottery_result(is_winner(contestant))
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
+        except Exception as e:
+            logging.info("Error: {e}".format(e))
+            client_sock.send_error_message(str(e))
         finally:
             client_sock.close()
             self.connection_status.delete_connection()
 
-    def __accept_new_connection(self):
+    def __accept_new_connection(self) -> ClientSocket:
         """
         Accept new connections
 

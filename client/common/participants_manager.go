@@ -1,18 +1,18 @@
 package common
 
 import (
-	"bufio"
+	// "bufio"
 	"fmt"
 	"net"
-	"time"
-	"os"
-    "os/signal"
-    "syscall"
+	// "time"
+	// "os"
+    // "os/signal"
+    // "syscall"
 	"encoding/binary"
 	"io"
 	"errors"
 
-	log "github.com/sirupsen/logrus"
+	// log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -137,4 +137,8 @@ func (p *ParticipantsManager) ReceiveParticipantResult() (bool, bool, error) { /
 	} else {
 		return false, false, fmt.Errorf("Received unexpected message type code %d", code)
 	}
+}
+
+func (p *ParticipantsManager) CloseConnection() error {
+	return p.conn.Close()
 }

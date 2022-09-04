@@ -1,9 +1,9 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
-	"net"
+	// "bufio"
+	// "fmt"
+	// "net"
 	"time"
 	"os"
     "os/signal"
@@ -27,7 +27,28 @@ type ClientConfig struct {
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
-	conn   net.Conn
+	manager   *ParticipantsManager
+}
+
+func logErrorMessage(id string, err error) {
+	log.Fatalf(
+		"[CLIENT %v] Error: %v",
+		id,
+		err,
+	)
+}
+
+func closeParticipantsManager(client *Client) error {
+	err := client.manager.CloseConnection()
+	if err != nil {
+		log.Fatalf(
+			"[CLIENT %v] Could not close socket connection. Error: %v",
+			client.config.ID,
+			err,
+		)
+	}
+	log.Infof("[CLIENT %v] Closed socket connection", c.config.ID)
+	return err
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -43,7 +64,8 @@ func NewClient(config ClientConfig) *Client {
 // failure, error is printed in stdout/stderr and exit 1
 // is returned
 func (c *Client) createClientSocket() error {
-	conn, err := net.Dial("tcp", c.config.ServerAddress)
+	manager, err := NewParticipantsManager(c.config)
+	c.manager = nil
 	if err != nil {
 		log.Fatalf(
 			"[CLIENT %v] Could not connect to server. Error: %v",
@@ -51,67 +73,50 @@ func (c *Client) createClientSocket() error {
 			err,
 		)
 	}
-	c.conn = conn
-	return nil
+	c.manager = manager
+	return err
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// Create the connection the server in every loop iteration. Send an
 	// autoincremental msgID to identify every message sent
-	c.createClientSocket()
-	msgID := 1
 	signal_channel := make(chan os.Signal, 1)
 	signal.Notify(signal_channel, syscall.SIGTERM)
 
-loop:
-	// Send messages if the loopLapse threshold has been not surpassed
-	for timeout := time.After(c.config.LoopLapse); ; {
-		select {
-		case <-timeout:
-			break loop
-		default:
-		}
-
-		// Send
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v sent\n",
+	err := c.createClientSocket()
+	if err != nil {
+		log.Fatalf(
+			"[CLIENT %v] Could not connect to server. Error: %v",
 			c.config.ID,
-			msgID,
+			err,
 		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		msgID++
-
-		if err != nil {
-			log.Errorf(
-				"[CLIENT %v] Error reading from socket. %v.",
-				c.config.ID,
-				err,
-			)
-			c.conn.Close()
-			return
-		}
-		log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
-
-		
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
-		
-		// Recreate connection to the server
-		c.conn.Close()
-		
-		// Process SIGTERM
-		select {
-		case <-signal_channel:
-			log.Infof("SIGTERM received")
-			os.Exit(143)
-		default:
-		}
-
-		c.createClientSocket()
+		return
 	}
+	defer closeParticipantsManager(c)
 
-	log.Infof("[CLIENT %v] Closing connection", c.config.ID)
-	c.conn.Close()
+	err = c.manager.SendParticipant()
+	if err != nil {
+		return
+	}
+	result, is_app_error, error_message := c.manager.ReceiveParticipantResult()
+	if is_app_error {
+		log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
+	} else if error_message != nil {
+		log.Fatal("[CLIENT %v] ")
+		logErrorMessage(c.config.ID, error_message)
+	}
+	if result {
+		log.Infof("[CLIENT %v] Participant has won the lottery")
+	} else {
+		log.Infof("[CLIENT %v] Participant did not win the lottery")
+	}
+	// Process SIGTERM
+	select {
+	case <-signal_channel:
+		log.Infof("SIGTERM received")
+		closeParticipantsManager(c)
+		os.Exit(143)
+	default:
+	}
 }
