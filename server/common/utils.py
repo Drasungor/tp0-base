@@ -28,7 +28,7 @@ def is_winner(contestant: Contestant) -> bool:
 
 
 """ Persist the information of each winner in the STORAGE file. Not thread-safe/process-safe. """
-def persist_winners(winners: list[Contestant]) -> None:
+def persist_winners(winners: "list[Contestant]") -> None:
 	with open(STORAGE, 'a+') as file:
 		for winner in winners:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
@@ -75,14 +75,19 @@ class ClientSocket:
 		self.socket.sendall(number_to_send.to_bytes(constants.bool_bytes_amount, "big"))
 
 
-	def recv_contestant(self) -> Contestant:
+	def recv_contestants(self) -> "list[Contestant]":
+		received_contestants = []
 		if (self.__read_message_code() != constants.normal_message_code):
 			raise Exception(f"Error received: {self.__read_string()}")
-		first_name = self.__read_string()
-		last_name = self.__read_string()
-		document = self.__read_string()
-		birthdate = self.__read_string()
-		return Contestant(first_name, last_name, document, birthdate)
+		read_number = int.from_bytes(self.__recv_all(constants.attributes_length_bytes_amount), "big")
+		while (read_number != constants.last_participant_delimiter):
+			first_name = self.__recv_all(read_number).decode()
+			last_name = self.__read_string()
+			document = self.__read_string()
+			birthdate = self.__read_string()
+			received_contestants.append(Contestant(first_name, last_name, document, birthdate))
+			read_number = int.from_bytes(self.__recv_all(constants.attributes_length_bytes_amount), "big")
+		return received_contestants
 
 	def send_error_message(self, message: str):
 		self.__send_error_message_code()
