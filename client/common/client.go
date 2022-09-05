@@ -86,10 +86,10 @@ func (c *Client) printBatchResult(batch_number int, result []Participant) {
 			log.Infof("[CLIENT %v] Last name: %s", c.config.ID, winner.last_name)
 			log.Infof("[CLIENT %v] Document: %s", c.config.ID, winner.document)
 			log.Infof("[CLIENT %v] Birthdate: %s", c.config.ID, winner.birthdate)
-			log.Infof("")
+			log.Infof("[CLIENT %v]", c.config.ID)
 		}
 	}
-	log.Infof("")
+	log.Infof("[CLIENT %v]", c.config.ID)
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
@@ -111,12 +111,15 @@ func (c *Client) StartClientLoop() {
 	defer closeParticipantsManager(c)
 
 	batch_number := 1
-	has_file_finished, sending_err := c.manager.SendParticipants()
+	total_participants_amount := 0
+	winners_amount := 0
+	sent_participants_amount, has_file_finished, sending_err := c.manager.SendParticipants()
 	if sending_err != nil {
 		logErrorMessage(c.config.ID, sending_err)
 		return
 	}
-	for !has_file_finished {
+	should_keep_sending_participants := has_file_finished
+	for should_keep_sending_participants {
 		result, is_app_error, error_message := c.manager.ReceiveWinningParticipants()
 		if is_app_error {
 			log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
@@ -126,13 +129,17 @@ func (c *Client) StartClientLoop() {
 			logErrorMessage(c.config.ID, error_message)
 			return
 		}
+		total_participants_amount += sent_participants_amount
+		winners_amount += len(result)
 		c.printBatchResult(batch_number, result)
 		batch_number += 1
-		has_file_finished, sending_err = c.manager.SendParticipants()
+		current_sent_participants_amount, has_file_finished, sending_err := c.manager.SendParticipants()
 		if sending_err != nil {
 			logErrorMessage(c.config.ID, sending_err)
 			return
 		}
+		sent_participants_amount = current_sent_participants_amount
+		should_keep_sending_participants = !has_file_finished
 
 		// Process SIGTERM
 		select {
@@ -143,4 +150,5 @@ func (c *Client) StartClientLoop() {
 		default:
 		}
 	}
+	log.Infof("[CLIENT %v] Finished participants evaluations, winner rate is: %f", c.config.ID, float32(winners_amount)/float32(total_participants_amount))
 }
