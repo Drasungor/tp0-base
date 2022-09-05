@@ -33,6 +33,9 @@ def persist_winners(winners: list[Contestant]) -> None:
 		for winner in winners:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
 
+class ClosedSocket(Exception):
+	pass
+
 class ClientSocket:
 	def __init__(self, socket: socket):
 		self.socket = socket
@@ -47,9 +50,12 @@ class ClientSocket:
 		return int.from_bytes(self.__recv_all(constants.message_type_code_bytes_amount), "big")
 
 	def __recv_all(self, bytes_amount: int):
-		received_bytes = b''
-		while (len(received_bytes) < bytes_amount):
-			received_bytes = self.socket.recv(bytes_amount - len(received_bytes))
+		total_received_bytes = b''
+		while (len(total_received_bytes) < bytes_amount):
+			received_bytes = self.socket.recv(bytes_amount - len(total_received_bytes))
+			if (len(received_bytes) == 0):
+				raise ClosedSocket
+			total_received_bytes += received_bytes
 		return received_bytes
 
 	def __read_string(self):

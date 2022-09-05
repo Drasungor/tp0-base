@@ -4,7 +4,7 @@ import signal
 import sys
 # import time
 
-from common.utils import ClientSocket, is_winner
+from common.utils import ClientSocket, ClosedSocket, is_winner
 
 class ConnectionStatus:
     def __init__(self, server_socket):
@@ -62,9 +62,12 @@ class Server:
             client_sock.send_lottery_result(is_winner(contestant))
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
+        except ClosedSocket:
+            logging.info("Socket closed unexpectedly")
         except Exception as e:
             logging.info("Error: {}".format(str(e)))
             client_sock.send_error_message(str(e))
+            
         finally:
             client_sock.close()
             self.connection_status.delete_connection()
