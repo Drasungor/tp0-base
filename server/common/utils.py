@@ -74,7 +74,6 @@ class ClientSocket:
 		self.__send_normal_message_code()
 		self.socket.sendall(number_to_send.to_bytes(constants.bool_bytes_amount, "big"))
 
-
 	def recv_contestants(self) -> "list[Contestant]":
 		received_contestants = []
 		if (self.__read_message_code() != constants.normal_message_code):
@@ -88,6 +87,16 @@ class ClientSocket:
 			received_contestants.append(Contestant(first_name, last_name, document, birthdate))
 			read_number = int.from_bytes(self.__recv_all(constants.attributes_length_bytes_amount), "big")
 		return received_contestants
+
+	def send_contestants(self, contestants: "list[Contestant]"):
+		self.__send_normal_message_code()
+		for contestant in contestants:
+			self.__send_string(contestant.first_name)
+			self.__send_string(contestant.last_name)
+			self.__send_string(contestant.document)
+			self.__send_string(contestant.birthdate)
+		self.socket.sendall(constants.last_participant_delimiter.to_bytes(constants.attributes_length_bytes_amount, "big"))
+
 
 	def send_error_message(self, message: str):
 		self.__send_error_message_code()

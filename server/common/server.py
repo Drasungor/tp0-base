@@ -58,8 +58,11 @@ class Server:
         client socket will also be closed
         """
         try:
-            contestant = client_sock.recv_contestant()
-            client_sock.send_lottery_result(is_winner(contestant))
+            while True:
+                contestants = client_sock.recv_contestants()
+                winners = filter(lambda contestant: is_winner(contestant), contestants)
+                # client_sock.send_lottery_result(is_winner(contestant))
+                client_sock.send_contestants(winners)
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
         except ClosedSocket:
