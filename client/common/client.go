@@ -75,6 +75,23 @@ func (c *Client) createClientSocket() error {
 	return err
 }
 
+func (c *Client) printBatchResult(batch_number int, result []Participant) {
+	log.Infof("[CLIENT %v] Batch: %d", batch_number)
+	if len(result) == 0 {
+		log.Infof("[CLIENT %v] No participant has won the lottery this batch", c.config.ID)
+	} else {
+		log.Infof("[CLIENT %v] Winners:", c.config.ID)
+		for _, winner := range result {
+			log.Infof("[CLIENT %v] First name: %s", c.config.ID, winner.first_name)
+			log.Infof("[CLIENT %v] Last name: %s", c.config.ID, winner.last_name)
+			log.Infof("[CLIENT %v] Document: %s", c.config.ID, winner.document)
+			log.Infof("[CLIENT %v] Birthdate: %s", c.config.ID, winner.birthdate)
+			log.Infof("")
+		}
+	}
+	log.Infof("")
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// Create the connection the server in every loop iteration. Send an
@@ -93,6 +110,7 @@ func (c *Client) StartClientLoop() {
 	}
 	defer closeParticipantsManager(c)
 
+	batch_number := 1
 	has_file_finished, sending_err := c.manager.SendParticipants()
 	if sending_err != nil {
 		logErrorMessage(c.config.ID, sending_err)
@@ -108,11 +126,8 @@ func (c *Client) StartClientLoop() {
 			logErrorMessage(c.config.ID, error_message)
 			return
 		}
-		if result {
-			log.Infof("[CLIENT %v] Participant has won the lottery", c.config.ID)
-		} else {
-			log.Infof("[CLIENT %v] Participant did not win the lottery", c.config.ID)
-		}
+		c.printBatchResult(batch_number, result)
+		batch_number += 1
 		has_file_finished, sending_err = c.manager.SendParticipants()
 		if sending_err != nil {
 			logErrorMessage(c.config.ID, sending_err)

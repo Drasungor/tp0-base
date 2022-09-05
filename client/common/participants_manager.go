@@ -106,10 +106,10 @@ func (p *ParticipantsManager) readByte() (byte, error) {
 	return byte_array[0], nil
 }
 
-func (p *ParticipantsManager) SendParticipants() (bool, error) { // (HasFileFinished, error)
+func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (ParticipantsSentAmount, HasFileFinished, error)
 	_, err := p.conn.Write([]byte{normal_message_code})
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	read_lines_amount := 1
 	line_data, current_error := p.fileReader.Read()
@@ -117,21 +117,23 @@ func (p *ParticipantsManager) SendParticipants() (bool, error) { // (HasFileFini
 		for _, data := range line_data {
 			err = p.sendString(data)
 			if err != nil {
-				return false, err
+				return read_lines_amount, false, err
 			}
 		}
-		line_data, current_error = p.fileReader.Read()
+		if (read_lines_amount < int(p.config.BatchSize)) {
+			line_data, current_error = p.fileReader.Read()
+		}
 		read_lines_amount++
 	}
 	if err != nil || err == io.EOF {
 		err = p.senduint32(last_participant_delimiter)
 	}
 	if err == nil {
-		return false, nil
+		return read_lines_amount - 1, false, nil
 	} else if err == io.EOF {
-		return true, nil
+		return read_lines_amount - 1, true, nil
 	} else {
-		return false, err
+		return read_lines_amount - 1, false, err
 	}
 }
 
