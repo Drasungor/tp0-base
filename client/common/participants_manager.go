@@ -13,7 +13,7 @@ import (
 	"errors"
 	"encoding/csv"
 
-	// log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -112,8 +112,9 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 		return 0, false, err
 	}
 	read_lines_amount := 1
-	line_data, current_error := p.fileReader.Read()
-	for (read_lines_amount <= int(p.config.BatchSize)) && current_error != nil {
+	line_data, err := p.fileReader.Read()
+	file_has_finished := false
+	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil {
 		for _, data := range line_data {
 			err = p.sendString(data)
 			if err != nil {
@@ -121,18 +122,17 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 			}
 		}
 		if (read_lines_amount < int(p.config.BatchSize)) {
-			line_data, current_error = p.fileReader.Read()
+			line_data, err = p.fileReader.Read()
 		}
 		read_lines_amount++
 	}
-	if err != nil || err == io.EOF {
+	file_has_finished = (err == io.EOF)
+	if err == nil || file_has_finished {
 		err = p.senduint32(last_participant_delimiter)
 	}
-	if err == nil {
-		return read_lines_amount - 1, false, nil
-	} else if err == io.EOF {
+	if file_has_finished {
 		return read_lines_amount - 1, true, nil
-	} else {
+	} else  {
 		return read_lines_amount - 1, false, err
 	}
 }
@@ -144,6 +144,8 @@ func (p *ParticipantsManager) readAllResults() ([]Participant, error) {
 		return nil, err
 	}
 	for read_number != last_participant_delimiter {
+		log.Infof("BORRAR Voy a entrar al loop de lectura de bytes")
+		
 		participant_first_name_bytes, err := p.readBytes(read_number)
 		if err != nil {
 			return nil, err
@@ -176,6 +178,7 @@ func (p *ParticipantsManager) readAllResults() ([]Participant, error) {
 }
 
 func (p *ParticipantsManager) ReceiveWinningParticipants() ([]Participant, bool, error) { // (Result, ApplicationError, error)
+	log.Infof("BORRAR Voy a leer el byte de tipo de mensaje")
 	code, err := p.readByte()
 	if err != nil {
 		return nil, false, err

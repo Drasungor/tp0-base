@@ -3,6 +3,7 @@ import logging
 import signal
 import sys
 # import time
+import traceback
 
 from common.utils import ClientSocket, ClosedSocket, is_winner
 
@@ -59,9 +60,12 @@ class Server:
         """
         try:
             while True:
+                logging.info("BORRAR AAAAAA")
                 contestants = client_sock.recv_contestants()
+                logging.info("BORRAR Recibi contestants")
                 winners = filter(lambda contestant: is_winner(contestant), contestants)
                 # client_sock.send_lottery_result(is_winner(contestant))
+                logging.info("BORRAR Voy a enviar contestants")
                 client_sock.send_contestants(winners)
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))
@@ -69,6 +73,7 @@ class Server:
             logging.info("Socket closed unexpectedly")
         except Exception as e:
             logging.info("Error: {}".format(str(e)))
+            logging.info("Error traceback: {}".format(traceback.format_exc()))
             client_sock.send_error_message(str(e))
         finally:
             client_sock.close()

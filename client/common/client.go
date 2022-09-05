@@ -76,7 +76,7 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) printBatchResult(batch_number int, result []Participant) {
-	log.Infof("[CLIENT %v] Batch: %d", batch_number)
+	log.Infof("[CLIENT %v] Batch: %d", c.config.ID, batch_number)
 	if len(result) == 0 {
 		log.Infof("[CLIENT %v] No participant has won the lottery this batch", c.config.ID)
 	} else {
@@ -118,14 +118,15 @@ func (c *Client) StartClientLoop() {
 		logErrorMessage(c.config.ID, sending_err)
 		return
 	}
-	should_keep_sending_participants := has_file_finished
+	log.Infof("BORRAR Voy a entrar al loop")
+	should_keep_sending_participants := !has_file_finished
 	for should_keep_sending_participants {
 		result, is_app_error, error_message := c.manager.ReceiveWinningParticipants()
+		log.Infof("BORRAR Me dieron los ganadores")
 		if is_app_error {
 			log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
 			return
 		} else if error_message != nil {
-			log.Fatal("[CLIENT %v] ")
 			logErrorMessage(c.config.ID, error_message)
 			return
 		}
