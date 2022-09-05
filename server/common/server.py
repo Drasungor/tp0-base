@@ -60,12 +60,17 @@ class Server:
         """
         try:
             while True:
-                logging.info("BORRAR AAAAAA")
                 contestants = client_sock.recv_contestants()
-                logging.info("BORRAR Recibi contestants")
+
+                # BORRAR
+                # for contestant in contestants:
+                #     logging.info("First name: {}".format(contestant.first_name))
+                #     logging.info("Last name: {}".format(contestant.last_name))
+                #     logging.info("Document: {}".format(contestant.document))
+                #     logging.info("Birthdate name: {}".format(contestant.birthdate))
+
                 winners = filter(lambda contestant: is_winner(contestant), contestants)
                 # client_sock.send_lottery_result(is_winner(contestant))
-                logging.info("BORRAR Voy a enviar contestants")
                 client_sock.send_contestants(winners)
         except OSError:
             logging.info("Error while reading socket {}".format(client_sock))

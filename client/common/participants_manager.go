@@ -12,8 +12,8 @@ import (
 	"io"
 	"errors"
 	"encoding/csv"
-
-	log "github.com/sirupsen/logrus"
+	// "golang.org/x/text/encoding/charmap"
+	// log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -35,6 +35,7 @@ type ParticipantsManager struct {
 	conn   net.Conn
 	config ClientConfig
 	fileReader *csv.Reader
+	file_ptr *os.File
 }
 
 func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
@@ -51,6 +52,7 @@ func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
 		conn: conn,
 		config: config,
 		fileReader: csv.NewReader(file),
+		file_ptr: file,
 	}
 	return manager, nil
 }
@@ -117,6 +119,7 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil {
 		for _, data := range line_data {
 			err = p.sendString(data)
+			// log.Infof("csv line : %v", data)
 			if err != nil {
 				return read_lines_amount, false, err
 			}
@@ -144,8 +147,6 @@ func (p *ParticipantsManager) readAllResults() ([]Participant, error) {
 		return nil, err
 	}
 	for read_number != last_participant_delimiter {
-		log.Infof("BORRAR Voy a entrar al loop de lectura de bytes")
-		
 		participant_first_name_bytes, err := p.readBytes(read_number)
 		if err != nil {
 			return nil, err
@@ -178,7 +179,6 @@ func (p *ParticipantsManager) readAllResults() ([]Participant, error) {
 }
 
 func (p *ParticipantsManager) ReceiveWinningParticipants() ([]Participant, bool, error) { // (Result, ApplicationError, error)
-	log.Infof("BORRAR Voy a leer el byte de tipo de mensaje")
 	code, err := p.readByte()
 	if err != nil {
 		return nil, false, err
@@ -201,5 +201,10 @@ func (p *ParticipantsManager) ReceiveWinningParticipants() ([]Participant, bool,
 }
 
 func (p *ParticipantsManager) CloseConnection() error {
+	err := p.file_ptr.Close()
+	if err != nil {
+		p.conn.Close()
+		return err
+	}
 	return p.conn.Close()
 }

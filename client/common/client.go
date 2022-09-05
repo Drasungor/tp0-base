@@ -118,11 +118,9 @@ func (c *Client) StartClientLoop() {
 		logErrorMessage(c.config.ID, sending_err)
 		return
 	}
-	log.Infof("BORRAR Voy a entrar al loop")
 	should_keep_sending_participants := !has_file_finished
 	for should_keep_sending_participants {
 		result, is_app_error, error_message := c.manager.ReceiveWinningParticipants()
-		log.Infof("BORRAR Me dieron los ganadores")
 		if is_app_error {
 			log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
 			return
@@ -151,5 +149,6 @@ func (c *Client) StartClientLoop() {
 		default:
 		}
 	}
+	log.Infof("[CLIENT %v] Winners amount: %f", c.config.ID, winners_amount)
 	log.Infof("[CLIENT %v] Finished participants evaluations, winner rate is: %f", c.config.ID, float32(winners_amount)/float32(total_participants_amount))
 }

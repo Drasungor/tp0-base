@@ -1,6 +1,7 @@
 import socket
 import time
 import datetime
+# import logging
 import common.constants as constants
 
 """ Winners storage location. """
@@ -63,7 +64,8 @@ class ClientSocket:
 		return self.__recv_all(string_length).decode()
 
 	def __send_string(self, message: str):
-		string_bytes = bytes(message, "utf8")
+		# string_bytes = bytes(message, "utf8")
+		string_bytes = message.encode()
 		self.socket.sendall(len(string_bytes).to_bytes(constants.attributes_length_bytes_amount, "big"))
 		self.socket.sendall(string_bytes)
 
@@ -94,7 +96,7 @@ class ClientSocket:
 			self.__send_string(contestant.first_name)
 			self.__send_string(contestant.last_name)
 			self.__send_string(contestant.document)
-			self.__send_string(contestant.birthdate)
+			self.__send_string(str(contestant.birthdate.date()))
 		self.socket.sendall(constants.last_participant_delimiter.to_bytes(constants.attributes_length_bytes_amount, "big"))
 
 
