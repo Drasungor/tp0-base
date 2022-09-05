@@ -56,7 +56,7 @@ class ClientSocket:
 			if (len(received_bytes) == 0):
 				raise ClosedSocket
 			total_received_bytes += received_bytes
-		return received_bytes
+		return total_received_bytes
 
 	def __read_string(self):
 		string_length = int.from_bytes(self.__recv_all(constants.attributes_length_bytes_amount), "big")
