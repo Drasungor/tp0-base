@@ -18,10 +18,8 @@ type ClientConfig struct {
 	ServerAddress string
 	LoopLapse     time.Duration
 	LoopPeriod    time.Duration
-	FirstName     string
-	LastName      string
-	Document      string
-	Birthdate     string
+	DatasetPath   string
+	BatchSize     uint32
 }
 
 // Client Entity that encapsulates how
@@ -95,30 +93,39 @@ func (c *Client) StartClientLoop() {
 	}
 	defer closeParticipantsManager(c)
 
-	err = c.manager.SendParticipant()
-	if err != nil {
+	has_file_finished, sending_err := c.manager.SendParticipants()
+	if sending_err != nil {
+		logErrorMessage(c.config.ID, sending_err)
 		return
 	}
-	result, is_app_error, error_message := c.manager.ReceiveParticipantResult()
-	if is_app_error {
-		log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
-		return
-	} else if error_message != nil {
-		log.Fatal("[CLIENT %v] ")
-		logErrorMessage(c.config.ID, error_message)
-		return
-	}
-	if result {
-		log.Infof("[CLIENT %v] Participant has won the lottery", c.config.ID)
-	} else {
-		log.Infof("[CLIENT %v] Participant did not win the lottery", c.config.ID)
-	}
-	// Process SIGTERM
-	select {
-	case <-signal_channel:
-		log.Infof("SIGTERM received")
-		closeParticipantsManager(c)
-		os.Exit(143)
-	default:
+	for !has_file_finished {
+		result, is_app_error, error_message := c.manager.ReceiveParticipantResult()
+		if is_app_error {
+			log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
+			return
+		} else if error_message != nil {
+			log.Fatal("[CLIENT %v] ")
+			logErrorMessage(c.config.ID, error_message)
+			return
+		}
+		if result {
+			log.Infof("[CLIENT %v] Participant has won the lottery", c.config.ID)
+		} else {
+			log.Infof("[CLIENT %v] Participant did not win the lottery", c.config.ID)
+		}
+		has_file_finished, sending_err = c.manager.SendParticipants()
+		if sending_err != nil {
+			logErrorMessage(c.config.ID, sending_err)
+			return
+		}
+
+		// Process SIGTERM
+		select {
+		case <-signal_channel:
+			log.Infof("SIGTERM received")
+			closeParticipantsManager(c)
+			os.Exit(143)
+		default:
+		}
 	}
 }

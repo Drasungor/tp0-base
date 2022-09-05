@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"net"
 	// "time"
-	// "os"
+	"os"
     // "os/signal"
     // "syscall"
 	"encoding/binary"
 	"io"
 	"errors"
+	"encoding/csv"
 
 	// log "github.com/sirupsen/logrus"
 )
@@ -19,6 +20,7 @@ const attributes_length_bytes_amount = 4
 const message_type_code_bytes_amount = 1
 const normal_message_code = 0
 const error_message_code = 1
+const last_participant_delimitor = 0xFFFFFFFF
 // const bool_bytes_amount = 1
 
 
@@ -32,6 +34,7 @@ type Participant struct {
 type ParticipantsManager struct {
 	conn   net.Conn
 	config ClientConfig
+	fileReader *csv.Reader
 }
 
 func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
@@ -39,9 +42,15 @@ func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
 	if err != nil {
 		return nil, err
 	}
+	file, error_message := os.Open(config.DatasetPath)
+	if error_message != nil {
+		conn.Close()
+		return nil, err
+	}
 	manager := &ParticipantsManager {
 		conn: conn,
 		config: config,
+		fileReader: csv.NewReader(file),
 	}
 	return manager, nil
 }
@@ -97,20 +106,33 @@ func (p *ParticipantsManager) readByte() (byte, error) {
 	return byte_array[0], nil
 }
 
-func (p *ParticipantsManager) SendParticipant() error {
+func (p *ParticipantsManager) SendParticipants() (bool, error) { // (HasFileFinished, error)
 	_, err := p.conn.Write([]byte{normal_message_code})
 	if err != nil {
-		return err
+		return false, err
 	}
-	config := p.config
-	participant_data := [4]string{config.FirstName, config.LastName, config.Document, config.Birthdate}
-	for _, data := range participant_data {
-		err = p.sendString(data)
-		if err != nil {
-			return err
+	read_lines_amount := 1
+	line_data, current_error := p.fileReader.Read()
+	for (read_lines_amount <= int(p.config.BatchSize)) && current_error != nil {
+		for _, data := range line_data {
+			err = p.sendString(data)
+			if err != nil {
+				return false, err
+			}
 		}
+		line_data, current_error = p.fileReader.Read()
+		read_lines_amount++
 	}
-	return nil
+	if err != nil || err == io.EOF {
+		err = p.senduint32(last_participant_delimitor)
+	}
+	if err == nil {
+		return false, nil
+	} else if err == io.EOF {
+		return true, nil
+	} else {
+		return false, err
+	}
 }
 
 func (p *ParticipantsManager) ReceiveParticipantResult() (bool, bool, error) { // (Result, ApplicationError, error)

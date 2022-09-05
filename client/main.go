@@ -35,10 +35,8 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
-	v.BindEnv("first", "name")
-	v.BindEnv("last", "name")
-	v.BindEnv("document")
-	v.BindEnv("birthdate")
+	v.BindEnv("dataset", "path")
+	v.BindEnv("batch", "size")
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -83,10 +81,8 @@ func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Loop Lapse: %v", v.GetDuration("loop.lapse"))
 	logrus.Infof("Loop Period: %v", v.GetDuration("loop.period"))
 	logrus.Infof("Log Level: %s", v.GetString("log.level"))
-	logrus.Infof("First name: %s", v.GetString("first.name"))
-	logrus.Infof("Last name: %s", v.GetString("last.name"))
-	logrus.Infof("Document: %s", v.GetString("document"))
-	logrus.Infof("Birthdate: %s", v.GetString("birthdate"))
+	logrus.Infof("Dataset Path: %s", v.GetString("dataset.path"))
+	logrus.Infof("Batch Size: %s", v.GetString("batch.size"))
 }
 
 func main() {
@@ -107,14 +103,10 @@ func main() {
 		ID:            v.GetString("id"),
 		LoopLapse:     v.GetDuration("loop.lapse"),
 		LoopPeriod:    v.GetDuration("loop.period"),
-		FirstName:     v.GetString("first.name"),
-		LastName:	   v.GetString("last.name"),
-		Document:      v.GetString("document"),
-		Birthdate:     v.GetString("birthdate"),
+		DatasetPath:   v.GetString("dataset.path"),
+		BatchSize:     v.GetUint32("batch.size"),
 	}
 
 	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
-
-
 }

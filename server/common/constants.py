@@ -4,3 +4,4 @@ bool_bytes_amount = 1
 message_code_bytes_amount = 1
 normal_message_code = 0
 error_message_code = 1
+last_participant_delimitor = 0xFFFFFFFF

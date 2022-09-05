@@ -21,32 +21,27 @@ services:
       - CLI_SERVER_ADDRESS=server:12345
       - CLI_LOOP_LAPSE=1m2s
       - CLI_LOG_LEVEL=DEBUG
-      - CLI_FIRST_NAME=Oscar
-      - CLI_LAST_NAME=Paez
-      - CLI_DOCUMENT=123456789
-      - CLI_BIRTHDATE=2008-04-25
+      - CLI_DATASET_PATH=/datasets/dataset-1.csv
+      - CLI_BATCH_SIZE=1000
     networks:
       - testing_net
     depends_on:
       - server
 
-  client2:
-    container_name: client2
-    image: client:latest
-    entrypoint: /client
-    environment:
-      - CLI_ID=2
-      - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
-      - CLI_LOG_LEVEL=DEBUG
-      - CLI_FIRST_NAME=Gerardo
-      - CLI_LAST_NAME=Lopez
-      - CLI_DOCUMENT=8465423
-      - CLI_BIRTHDATE=2020-01-25
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # client2:
+  #   container_name: client2
+  #   image: client:latest
+  #   entrypoint: /client
+  #   environment:
+  #     - CLI_ID=2
+  #     - CLI_SERVER_ADDRESS=server:12345
+  #     - CLI_LOOP_LAPSE=1m2s
+  #     - CLI_LOG_LEVEL=DEBUG
+  #     - CLI_DATASET_PATH=/datasets/dataset-2.csv
+  #   networks:
+  #     - testing_net
+  #   depends_on:
+  #     - server
 
 networks:
   testing_net:
