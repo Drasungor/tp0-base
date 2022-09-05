@@ -20,7 +20,7 @@ const attributes_length_bytes_amount = 4
 const message_type_code_bytes_amount = 1
 const normal_message_code = 0
 const error_message_code = 1
-const last_participant_delimitor = 0xFFFFFFFF
+const last_participant_delimiter = 0xFFFFFFFF
 // const bool_bytes_amount = 1
 
 
@@ -124,7 +124,7 @@ func (p *ParticipantsManager) SendParticipants() (bool, error) { // (HasFileFini
 		read_lines_amount++
 	}
 	if err != nil || err == io.EOF {
-		err = p.senduint32(last_participant_delimitor)
+		err = p.senduint32(last_participant_delimiter)
 	}
 	if err == nil {
 		return false, nil
@@ -135,29 +135,63 @@ func (p *ParticipantsManager) SendParticipants() (bool, error) { // (HasFileFini
 	}
 }
 
-func (p *ParticipantsManager) ReceiveParticipantResult() (bool, bool, error) { // (Result, ApplicationError, error)
+func (p *ParticipantsManager) readAllResults() ([]Participant, error) {
+	winners := []Participant{}
+	read_number, err := p.readuint32()
+	if err != nil {
+		return nil, err
+	}
+	for read_number != last_participant_delimiter {
+		participant_first_name_bytes, err := p.readBytes(read_number)
+		if err != nil {
+			return nil, err
+		}
+		participant_last_name, err := p.readString()
+		if err != nil {
+			return nil, err
+		}
+		participant_document, err := p.readString()
+		if err != nil {
+			return nil, err
+		}
+		participant_birthdate, err := p.readString()
+		if err != nil {
+			return nil, err
+		}
+		participant := Participant {
+			first_name: string(participant_first_name_bytes),
+			last_name: participant_last_name,
+			document: participant_document,
+			birthdate: participant_birthdate,
+		}
+		winners = append(winners, participant)
+		read_number, err = p.readuint32()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return winners, nil
+}
+
+func (p *ParticipantsManager) ReceiveWinningParticipants() ([]Participant, bool, error) { // (Result, ApplicationError, error)
 	code, err := p.readByte()
 	if err != nil {
-		return false, false, err
+		return nil, false, err
 	}
 	if code == error_message_code {
 		message, err := p.readString()
 		if err != nil {
-			return false, false, err
+			return nil, false, err
 		}
-		return false, true, errors.New(message)
+		return nil, true, errors.New(message)
 	} else if code == normal_message_code {
-		received_result, err := p.readByte()
+		results, err := p.readAllResults()
 		if err != nil {
-			return false, false, err
+			return nil, false, err
 		}
-		returned_result := received_result == 1
-		if !returned_result && received_result != 0 {
-			return false, false, fmt.Errorf("Received unexpected participation result %d", received_result)
-		}
-		return returned_result, false, nil
+		return results, false, nil
 	} else {
-		return false, false, fmt.Errorf("Received unexpected message type code %d", code)
+		return nil, false, fmt.Errorf("Received unexpected message type code %d", code)
 	}
 }
 

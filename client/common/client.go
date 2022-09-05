@@ -99,7 +99,7 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 	for !has_file_finished {
-		result, is_app_error, error_message := c.manager.ReceiveParticipantResult()
+		result, is_app_error, error_message := c.manager.ReceiveWinningParticipants()
 		if is_app_error {
 			log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
 			return
