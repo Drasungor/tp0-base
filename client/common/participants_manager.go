@@ -4,16 +4,19 @@ import (
 	// "bufio"
 	"fmt"
 	"net"
+	"strings"
+
 	// "time"
 	"os"
-    // "os/signal"
-    // "syscall"
+	// "os/signal"
+	// "syscall"
+	"bufio"
 	"encoding/binary"
-	"io"
+	// "encoding/csv"
 	"errors"
-	"encoding/csv"
+	"io"
 	// "golang.org/x/text/encoding/charmap"
-	// log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -34,7 +37,8 @@ type Participant struct {
 type ParticipantsManager struct {
 	conn   net.Conn
 	config ClientConfig
-	fileReader *csv.Reader
+	// fileReader *csv.Reader
+	fileReader *bufio.Scanner
 	file_ptr *os.File
 }
 
@@ -51,7 +55,8 @@ func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
 	manager := &ParticipantsManager {
 		conn: conn,
 		config: config,
-		fileReader: csv.NewReader(file),
+		// fileReader: csv.NewReader(file),
+		fileReader: bufio.NewScanner(file),
 		file_ptr: file,
 	}
 	return manager, nil
@@ -114,9 +119,20 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 		return 0, false, err
 	}
 	read_lines_amount := 1
-	line_data, err := p.fileReader.Read()
+	// line_data, err := p.fileReader.Read()
+	can_scanner_still_read := p.fileReader.Scan()
 	file_has_finished := false
-	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil {
+
+	if !can_scanner_still_read {
+		err = p.fileReader.Err()
+		file_has_finished = err == nil
+	}
+	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil && !file_has_finished {
+		line_string := string(p.fileReader.Bytes())
+
+		// log.Infof("LINE STRING: %v", line_string)
+
+		line_data := strings.Split(line_string, ",")
 		for _, data := range line_data {
 			err = p.sendString(data)
 			// log.Infof("csv line : %v", data)
@@ -125,7 +141,12 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 			}
 		}
 		if (read_lines_amount < int(p.config.BatchSize)) {
-			line_data, err = p.fileReader.Read()
+			// line_data, err = p.fileReader.Read()
+			can_scanner_still_read = p.fileReader.Scan()
+			if !can_scanner_still_read {
+				err = p.fileReader.Err()
+				file_has_finished = err == nil
+			}
 		}
 		read_lines_amount++
 	}
