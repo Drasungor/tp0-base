@@ -3,6 +3,7 @@ import time
 import datetime
 # import logging
 import common.constants as constants
+import multiprocessing as mp
 
 """ Winners storage location. """
 STORAGE = "./winners"
@@ -28,11 +29,22 @@ def is_winner(contestant: Contestant) -> bool:
 	return hash(contestant) % 17 == 0
 
 
+
+
+
 """ Persist the information of each winner in the STORAGE file. Not thread-safe/process-safe. """
 def persist_winners(winners: "list[Contestant]") -> None:
 	with open(STORAGE, 'a+') as file:
 		for winner in winners:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
+
+
+def update_winners_file(winners_queue: mp.Queue):
+	received_message = winners_queue.get()
+	while received_message != None:
+		persist_winners(received_message)
+		received_message = winners_queue.get()
+
 
 class ClosedSocket(Exception):
 	pass

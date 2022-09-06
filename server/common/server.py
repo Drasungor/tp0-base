@@ -4,8 +4,46 @@ import signal
 import sys
 # import time
 import traceback
+import multiprocessing as mp
+import concurrent.futures as fut
 
-from common.utils import ClientSocket, ClosedSocket, is_winner
+from common.utils import ClientSocket, ClosedSocket, is_winner, update_winners_file
+
+
+
+def handle_client_connection(client_sock: ClientSocket):
+    """
+    Read message from a specific client socket and closes the socket
+
+    If a problem arises in the communication with the client, the
+    client socket will also be closed
+    """
+    try:
+        while True:
+            contestants = client_sock.recv_contestants()
+
+            # BORRAR
+            # for contestant in contestants:
+            #     logging.info("First name: {}".format(contestant.first_name))
+            #     logging.info("Last name: {}".format(contestant.last_name))
+            #     logging.info("Document: {}".format(contestant.document))
+            #     logging.info("Birthdate name: {}".format(contestant.birthdate))
+
+            winners = filter(lambda contestant: is_winner(contestant), contestants)
+            # client_sock.send_lottery_result(is_winner(contestant))
+            client_sock.send_contestants(winners)
+    except OSError:
+        logging.info("Error while reading socket {}".format(client_sock))
+    except ClosedSocket:
+        logging.info("Socket closed unexpectedly")
+    except Exception as e:
+        logging.info("Error: {}".format(str(e)))
+        logging.info("Error traceback: {}".format(traceback.format_exc()))
+        client_sock.send_error_message(str(e))
+    finally:
+        client_sock.close()
+        self.connection_status.delete_connection()
+
 
 class ConnectionStatus:
     def __init__(self, server_socket):
@@ -44,45 +82,20 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
+        file_writer_queue = mp.Queue()
+        mp.Process(target = update_winners_file, args = [file_writer_queue])
+
+        pools_available_processes = mp.cpu_count() - 2
+        processors_pool = fut.ProcessPoolExecutor(pools_available_processes) # Since we will have this and the file writer processes
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
+        not_done_tasks = []
         while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+            while len(not_done_tasks) < pools_available_processes:
+                client_sock = self.__accept_new_connection()
+                handle_client_connection(client_sock)
 
-    def __handle_client_connection(self, client_sock: ClientSocket):
-        """
-        Read message from a specific client socket and closes the socket
-
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
-        try:
-            while True:
-                contestants = client_sock.recv_contestants()
-
-                # BORRAR
-                # for contestant in contestants:
-                #     logging.info("First name: {}".format(contestant.first_name))
-                #     logging.info("Last name: {}".format(contestant.last_name))
-                #     logging.info("Document: {}".format(contestant.document))
-                #     logging.info("Birthdate name: {}".format(contestant.birthdate))
-
-                winners = filter(lambda contestant: is_winner(contestant), contestants)
-                # client_sock.send_lottery_result(is_winner(contestant))
-                client_sock.send_contestants(winners)
-        except OSError:
-            logging.info("Error while reading socket {}".format(client_sock))
-        except ClosedSocket:
-            logging.info("Socket closed unexpectedly")
-        except Exception as e:
-            logging.info("Error: {}".format(str(e)))
-            logging.info("Error traceback: {}".format(traceback.format_exc()))
-            client_sock.send_error_message(str(e))
-        finally:
-            client_sock.close()
-            self.connection_status.delete_connection()
 
     def __accept_new_connection(self) -> ClientSocket:
         """
