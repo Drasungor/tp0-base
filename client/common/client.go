@@ -92,6 +92,29 @@ func (c *Client) printBatchResult(batch_number int, result []Participant) {
 	log.Infof("[CLIENT %v]", c.config.ID)
 }
 
+func (c *Client) processBatch(batch_number *int, total_participants_amount *int, sent_participants_amount *int, winners_amount *int) (bool, error) {
+	result, is_app_error, error_message := c.manager.ReceiveWinningParticipants()
+	if is_app_error {
+		log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
+		return false, error_message
+	} else if error_message != nil {
+		logErrorMessage(c.config.ID, error_message)
+		return false, error_message
+	}
+	*total_participants_amount += *sent_participants_amount
+	*winners_amount += len(result)
+	c.printBatchResult(*batch_number, result)
+	*batch_number += 1
+	current_sent_participants_amount, has_file_finished, sending_err := c.manager.SendParticipants()
+	if sending_err != nil {
+		logErrorMessage(c.config.ID, sending_err)
+		return false, sending_err
+	}
+	*sent_participants_amount = current_sent_participants_amount
+	return !has_file_finished, nil
+	// should_keep_sending_participants = !has_file_finished
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// Create the connection the server in every loop iteration. Send an
@@ -120,25 +143,11 @@ func (c *Client) StartClientLoop() {
 	}
 	should_keep_sending_participants := !has_file_finished
 	for should_keep_sending_participants {
-		result, is_app_error, error_message := c.manager.ReceiveWinningParticipants()
-		if is_app_error {
-			log.Infof("[CLIENT %v] Application logic error: %v", c.config.ID, error_message)
-			return
-		} else if error_message != nil {
-			logErrorMessage(c.config.ID, error_message)
+		should_keep_sending_participants, err = c.processBatch(&batch_number, &total_participants_amount, &sent_participants_amount, &winners_amount)
+
+		if err != nil {
 			return
 		}
-		total_participants_amount += sent_participants_amount
-		winners_amount += len(result)
-		c.printBatchResult(batch_number, result)
-		batch_number += 1
-		current_sent_participants_amount, has_file_finished, sending_err := c.manager.SendParticipants()
-		if sending_err != nil {
-			logErrorMessage(c.config.ID, sending_err)
-			return
-		}
-		sent_participants_amount = current_sent_participants_amount
-		should_keep_sending_participants = !has_file_finished
 
 		// Process SIGTERM
 		select {
@@ -149,6 +158,8 @@ func (c *Client) StartClientLoop() {
 		default:
 		}
 	}
-	log.Infof("[CLIENT %v] Winners amount: %f", c.config.ID, winners_amount)
+	c.processBatch(&batch_number, &total_participants_amount, &sent_participants_amount, &winners_amount)
+	log.Infof("[CLIENT %v] Winners amount: %d", c.config.ID, winners_amount)
+	log.Infof("[CLIENT %v] Total participants amount: %d", c.config.ID, total_participants_amount)
 	log.Infof("[CLIENT %v] Finished participants evaluations, winner rate is: %f", c.config.ID, float32(winners_amount)/float32(total_participants_amount))
 }
