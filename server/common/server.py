@@ -31,17 +31,20 @@ def await_closing_message(message_queue: mp.Queue, should_keep_iterating: Atomic
     message_queue.get()
     should_keep_iterating.atomic_write(False)
 
-def handle_client_connection(connections_processors_queue: mp.Queue, client_sock: ClientSocket):
+def handle_client_connection(file_writer_queue: mp.Queue, connections_processors_queue: mp.Queue, client_sock: ClientSocket):
     """
     Read message from a specific client socket and closes the socket
 
     If a problem arises in the communication with the client, the
     client socket will also be closed
     """
+    should_keep_iterating = AtomicVariable(True)
+
+     # Since this thread will just wait for the queue message, and the process has a
+     # lot of I/O operations, this thread should not affect performance
+    queue_reader_thread = threading.Thread(target = connections_processors_queue, args = (connections_processors_queue, should_keep_iterating))
+    queue_reader_thread.start()                                          
     try:
-        should_keep_iterating = AtomicVariable(True)
-        queue_reader_thread = threading.Thread(connections_processors_queue) # Since this thread will just wait for the queue message, and the process has a
-        queue_reader_thread.start()                                          # lot of I/O operations, this thread should not affect performance
         while should_keep_iterating.atomic_read():
             contestants = client_sock.recv_contestants()
 
@@ -55,6 +58,7 @@ def handle_client_connection(connections_processors_queue: mp.Queue, client_sock
             winners = filter(lambda contestant: is_winner(contestant), contestants)
             # client_sock.send_lottery_result(is_winner(contestant))
             client_sock.send_contestants(winners)
+            file_writer_queue.put(winners)
     except OSError:
         logging.info("Error while reading socket {}".format(client_sock))
     except ClosedSocket:
@@ -67,6 +71,8 @@ def handle_client_connection(connections_processors_queue: mp.Queue, client_sock
         client_sock.close()
         connections_processors_queue.close()
         connections_processors_queue.join_thread()
+        file_writer_queue.close()
+        file_writer_queue.join_thread()
         queue_reader_thread.join()
 
 class ConnectionStatus:
@@ -119,9 +125,10 @@ class Server:
         while True:
             while len(not_done_tasks) < pools_available_processes:
                 client_sock = self.__accept_new_connection()
-                handle_client_connection(connections_processors_queue, client_sock)
-                not_done_tasks.append(processors_pool.submit(handle_client_connection, client_sock))
+                # handle_client_connection(connections_processors_queue, client_sock)
+                not_done_tasks.append(processors_pool.submit(handle_client_connection, file_writer_queue, connections_processors_queue, client_sock))
             _, not_done_tasks = mp.wait(not_done_tasks, return_when = mp.FIRST_COMPLETED)
+        # TODO: cerrar cola de file process en sigterm
 
 
     def __accept_new_connection(self) -> ClientSocket:

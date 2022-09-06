@@ -44,6 +44,8 @@ def update_winners_file(winners_queue: mp.Queue):
 	while received_message != None:
 		persist_winners(received_message)
 		received_message = winners_queue.get()
+	winners_queue.close()
+	winners_queue.join_thread()
 
 
 class ClosedSocket(Exception):
