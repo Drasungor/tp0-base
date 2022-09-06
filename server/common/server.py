@@ -31,19 +31,31 @@ def await_closing_message(message_queue: mp.Queue, should_keep_iterating: Atomic
     message_queue.get()
     should_keep_iterating.atomic_write(False)
 
-def handle_client_connection(file_writer_queue: mp.Queue, connections_processors_queue: mp.Queue, client_sock: ClientSocket):
+def print_queue_messages(print_queue: mp.Queue):
+    logging.info("Voy a leer del printer queue")
+    message = print_queue.get()
+    logging.info("Lei del printer queue")
+    while message != None:
+        logging.info(message)
+        message = print_queue.get()
+
+
+def handle_client_connection(file_writer_queue: mp.Queue, connections_processors_queue: mp.Queue, client_sock: ClientSocket, print_queue: mp.Queue):
     """
     Read message from a specific client socket and closes the socket
 
     If a problem arises in the communication with the client, the
     client socket will also be closed
     """
+    print_queue.put("Empiezo el handler")
     should_keep_iterating = AtomicVariable(True)
 
      # Since this thread will just wait for the queue message, and the process has a
      # lot of I/O operations, this thread should not affect performance
-    queue_reader_thread = threading.Thread(target = connections_processors_queue, args = (connections_processors_queue, should_keep_iterating))
-    queue_reader_thread.start()                                          
+    queue_reader_thread = threading.Thread(target = await_closing_message, args = (connections_processors_queue, should_keep_iterating))
+    queue_reader_thread.start()
+
+
     try:
         while should_keep_iterating.atomic_read():
             contestants = client_sock.recv_contestants()
@@ -114,6 +126,11 @@ class Server:
         """
         file_writer_queue = mp.Queue()
         connections_processors_queue = mp.Queue()
+
+        print_queue = mp.Queue()
+        printer_thread = threading.Thread(target = print_queue_messages, args = (print_queue, ))
+        printer_thread.start()
+
         mp.Process(target = update_winners_file, args = [file_writer_queue])
 
         pools_available_processes = mp.cpu_count() - 2
@@ -126,8 +143,16 @@ class Server:
             while len(not_done_tasks) < pools_available_processes:
                 client_sock = self.__accept_new_connection()
                 # handle_client_connection(connections_processors_queue, client_sock)
-                not_done_tasks.append(processors_pool.submit(handle_client_connection, file_writer_queue, connections_processors_queue, client_sock))
-            _, not_done_tasks = mp.wait(not_done_tasks, return_when = mp.FIRST_COMPLETED)
+                # not_done_tasks.append(processors_pool.submit(handle_client_connection, file_writer_queue, connections_processors_queue, client_sock, print_queue))
+                future = processors_pool.submit(handle_client_connection, file_writer_queue, connections_processors_queue, client_sock, print_queue)
+                logging.info("Future is running {}".format(future.running()))
+                
+                not_done_tasks.append(future)
+                # logging.info("Voy a leer del print queue")
+                # logging.info(print_queue.get())
+                # logging.info("Lei del print queue")
+                _, not_done_tasks = fut.wait(not_done_tasks, return_when = fut.FIRST_COMPLETED)
+            # _, not_done_tasks = fut.wait(not_done_tasks, return_when = fut.FIRST_COMPLETED)
         # TODO: cerrar cola de file process en sigterm
 
 
