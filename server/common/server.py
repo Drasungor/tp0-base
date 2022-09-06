@@ -6,12 +6,32 @@ import sys
 import traceback
 import multiprocessing as mp
 import concurrent.futures as fut
+import threading
 
 from common.utils import ClientSocket, ClosedSocket, is_winner, update_winners_file
 
 
+class AtomicVariable:
+    def __init__(self, value):
+        self.lock = threading.Lock()
+        self.value = value
 
-def handle_client_connection(client_sock: ClientSocket):
+    def atomic_write(self, value):
+        self.lock.acquire()
+        self.value = value 
+        self.lock.release()
+
+    def atomic_read(self):
+        self.lock.acquire()
+        ret_value = self.value
+        self.lock.release()
+        return ret_value
+
+def await_closing_message(message_queue: mp.Queue, should_keep_iterating: AtomicVariable):
+    message_queue.get()
+    should_keep_iterating.atomic_write(False)
+
+def handle_client_connection(connections_processors_queue: mp.Queue, client_sock: ClientSocket):
     """
     Read message from a specific client socket and closes the socket
 
@@ -19,7 +39,10 @@ def handle_client_connection(client_sock: ClientSocket):
     client socket will also be closed
     """
     try:
-        while True:
+        should_keep_iterating = AtomicVariable(True)
+        queue_reader_thread = threading.Thread(connections_processors_queue) # Since this thread will just wait for the queue message, and the process has a
+        queue_reader_thread.start()                                          # lot of I/O operations, this thread should not affect performance
+        while should_keep_iterating.atomic_read():
             contestants = client_sock.recv_contestants()
 
             # BORRAR
@@ -42,8 +65,9 @@ def handle_client_connection(client_sock: ClientSocket):
         client_sock.send_error_message(str(e))
     finally:
         client_sock.close()
-        self.connection_status.delete_connection()
-
+        connections_processors_queue.close()
+        connections_processors_queue.join_thread()
+        queue_reader_thread.join()
 
 class ConnectionStatus:
     def __init__(self, server_socket):
@@ -83,6 +107,7 @@ class Server:
         finishes, servers starts to accept new connections again
         """
         file_writer_queue = mp.Queue()
+        connections_processors_queue = mp.Queue()
         mp.Process(target = update_winners_file, args = [file_writer_queue])
 
         pools_available_processes = mp.cpu_count() - 2
@@ -94,7 +119,9 @@ class Server:
         while True:
             while len(not_done_tasks) < pools_available_processes:
                 client_sock = self.__accept_new_connection()
-                handle_client_connection(client_sock)
+                handle_client_connection(connections_processors_queue, client_sock)
+                not_done_tasks.append(processors_pool.submit(handle_client_connection, client_sock))
+            _, not_done_tasks = mp.wait(not_done_tasks, return_when = mp.FIRST_COMPLETED)
 
 
     def __accept_new_connection(self) -> ClientSocket:
