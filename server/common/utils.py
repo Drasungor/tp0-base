@@ -25,12 +25,14 @@ class FileWriterStatus:
 		self.file = None
 
 	def free_resources(self, *args):
+		logging.info("Filewriter process SIGTERM received")
 		self.winners_queue.close()
 		self.winners_queue.join_thread()
 		logging.info("Closed file writer process queue")
 		if (not (self.file is None)):
 			self.file.close()
 			logging.info("Closed file writer file")
+		logging.info("Exiting filewriter process")
 		sys.exit(143)
 
 """ Contestant data model. """

@@ -14,6 +14,9 @@ class MainProcessStatus:
     def __init__(self, server_socket, file_writer_queue, sockets_queue):
         self.current_connection = None
         self._server_socket = server_socket
+        self.file_writer_queue = file_writer_queue 
+        self.sockets_queue = sockets_queue
+        self.processes = []
         signal.signal(signal.SIGTERM, self.close_connection)
     
     def add_connection(self, socket):
@@ -22,8 +25,14 @@ class MainProcessStatus:
     def delete_connection(self):
         self.current_connection = None
 
+    def add_children(self, children):
+        self.processes.extend(children)
+
     def close_connection(self, *args):
-        logging.info("SIGTERM received")
+        logging.info("Main process SIGTERM received")
+        for child in self.processes:
+            child.terminate()
+        logging.info("Sent SIGTERM to all child processes")
         self._server_socket.close()
         logging.info("Closed server socket")
         if (not (self.current_connection is None)):
@@ -35,6 +44,7 @@ class MainProcessStatus:
         self.sockets_queue.close()
         self.sockets_queue.join_thread()
         logging.info("Closed file sockets queue")
+        logging.info("Exiting main process")
         sys.exit(143)
 
 class ClientProcessStatus:
@@ -51,7 +61,7 @@ class ClientProcessStatus:
         self.connection = None
 
     def close_resources(self, *args):
-        logging.info("SIGTERM received")
+        logging.info("Client process SIGTERM received")
         if (not (self.connection is None)):
             self.connection.close()
             logging.info("Closed dangling socket connection")
@@ -68,6 +78,7 @@ class ClientProcessStatus:
         self.sockets_queue.close()
         self.sockets_queue.join_thread()
         logging.info("Closed sockets queue")
+        logging.info("Exiting client process")
         sys.exit(143)
 
 
@@ -147,6 +158,8 @@ class Server:
         writer_process = mp.Process(target = update_winners_file, args = [file_writer_queue])
         writer_process.start()
 
+        self.connection_status.add_children([writer_process])
+
         clients_processes = []
         for _ in range(client_processes_amount):
             client_process = mp.Process(target = handle_client_connection, args = [file_writer_queue, sockets_queue])
@@ -154,8 +167,10 @@ class Server:
             clients_processes.append(client_process)
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
+        self.connection_status.add_children(clients_processes)
         while True:
             sockets_queue.put(self.__accept_new_connection())
+            self.connection_status.delete_connection()
             logging.info("Accepted new connection")
 
         # TODO: cerrar cola de file process en sigterm
