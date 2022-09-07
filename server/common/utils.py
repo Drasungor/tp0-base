@@ -13,9 +13,10 @@ STORAGE = "./winners"
 
 
 class FileWriterStatus:
-	def __init__(self, winners_queue):
+	def __init__(self, process_id, winners_queue):
 		self.winners_queue: mp.Queue = winners_queue
 		self.file: TextIOWrapper = None
+		self.process_id = process_id
 		signal.signal(signal.SIGTERM, self.free_resources)
 
 	def add_file(self, file):
@@ -25,14 +26,14 @@ class FileWriterStatus:
 		self.file = None
 
 	def free_resources(self, *args):
-		logging.info("Filewriter process SIGTERM received")
+		logging.info("[Process {}] Filewriter process SIGTERM received".format(self.process_id))
 		self.winners_queue.close()
 		self.winners_queue.join_thread()
-		logging.info("Closed file writer process queue")
+		logging.info("[Process {}] Closed file writer process queue".format(self.process_id))
 		if (not (self.file is None)):
 			self.file.close()
-			logging.info("Closed file writer file")
-		logging.info("Exiting filewriter process")
+			logging.info("[Process {}] Closed file writer file".format(self.process_id))
+		logging.info("[Process {}] Exiting filewriter process".format(self.process_id))
 		sys.exit(143)
 
 """ Contestant data model. """
@@ -62,8 +63,8 @@ def persist_winners(status_manager: FileWriterStatus, winners: "list[Contestant]
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
 		status_manager.remove_file()
 
-def update_winners_file(winners_queue: mp.Queue):
-	status_manager = FileWriterStatus(winners_queue)
+def update_winners_file(process_id: int, winners_queue: mp.Queue):
+	status_manager = FileWriterStatus(process_id, winners_queue)
 	received_message = winners_queue.get()
 	while received_message != None:
 		persist_winners(status_manager, received_message)

@@ -11,8 +11,9 @@ from common.utils import ClientSocket, ClosedSocket, is_winner, update_winners_f
 
 
 class MainProcessStatus:
-    def __init__(self, server_socket, file_writer_queue, sockets_queue):
+    def __init__(self, process_id, server_socket, file_writer_queue, sockets_queue):
         self.current_connection = None
+        self.process_id = process_id
         self._server_socket = server_socket
         self.file_writer_queue = file_writer_queue 
         self.sockets_queue = sockets_queue
@@ -29,28 +30,29 @@ class MainProcessStatus:
         self.processes.extend(children)
 
     def close_connection(self, *args):
-        logging.info("Main process SIGTERM received")
+        logging.info("[Process {}] Main process SIGTERM received".format(self.process_id))
         for child in self.processes:
             child.terminate()
-        logging.info("Sent SIGTERM to all child processes")
+        logging.info("[Process {}] Sent SIGTERM to all child processes".format(self.process_id))
         self._server_socket.close()
-        logging.info("Closed server socket")
+        logging.info("[Process {}] Closed server socket".format(self.process_id))
         if (not (self.current_connection is None)):
             self.current_connection.close()
-            logging.info("Closed dangling socket connection")
+            logging.info("[Process {}] Closed dangling socket connection".format(self.process_id))
         self.file_writer_queue.close()
         self.file_writer_queue.join_thread()
-        logging.info("Closed file writer process queue")
+        logging.info("[Process {}] Closed file writer process queue".format(self.process_id))
         self.sockets_queue.close()
         self.sockets_queue.join_thread()
-        logging.info("Closed file sockets queue")
-        logging.info("Exiting main process")
+        logging.info("[Process {}] Closed file sockets queue".format(self.process_id))
+        logging.info("[Process {}] Exiting main process".format(self.process_id))
         sys.exit(143)
 
 class ClientProcessStatus:
-    def __init__(self, file_writer_queue, sockets_queue):
+    def __init__(self, process_id, file_writer_queue, sockets_queue):
         self.file_writer_queue: mp.Queue = file_writer_queue
         self.sockets_queue: mp.Queue = sockets_queue
+        self.process_id = process_id
         self.connection: ClientSocket = None
         signal.signal(signal.SIGTERM, self.close_resources)
 
@@ -61,29 +63,29 @@ class ClientProcessStatus:
         self.connection = None
 
     def close_resources(self, *args):
-        logging.info("Client process SIGTERM received")
+        logging.info("[Process {}] Client process SIGTERM received".format(self.process_id))
         if (not (self.connection is None)):
             self.connection.close()
-            logging.info("Closed dangling socket connection")
+            logging.info("[Process {}] Closed dangling socket connection".format(self.process_id))
         self.file_writer_queue.close()
         self.file_writer_queue.join_thread()
-        logging.info("Closed file writer process queue")
+        logging.info("[Process {}] Closed file writer process queue".format(self.process_id))
         is_queue_empty = False
         while (not is_queue_empty):
             try:
                 self.sockets_queue.get_nowait().close()
-                logging.info("Closed dangling queue socket connection")
+                logging.info("[Process {}] Closed dangling queue socket connection".format(self.process_id))
             except queue.Empty:
                 is_queue_empty = True
         self.sockets_queue.close()
         self.sockets_queue.join_thread()
-        logging.info("Closed sockets queue")
-        logging.info("Exiting client process")
+        logging.info("[Process {}] Closed sockets queue".format(self.process_id))
+        logging.info("[Process {}] Exiting client process".format(self.process_id))
         sys.exit(143)
 
 
 
-def handle_client_connection(file_writer_queue: mp.Queue, sockets_queue: mp.Queue):
+def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, sockets_queue: mp.Queue):
     """
     Read message from a specific client socket and closes the socket
 
@@ -95,7 +97,7 @@ def handle_client_connection(file_writer_queue: mp.Queue, sockets_queue: mp.Queu
      # Since this thread will just wait for the queue message, and the process has a
      # lot of I/O operations, this thread should not affect performance
 
-    process_status = ClientProcessStatus(file_writer_queue, sockets_queue)
+    process_status = ClientProcessStatus(process_id, file_writer_queue, sockets_queue)
 
     connection_is_alive = False
     handled_exception = False
@@ -110,14 +112,14 @@ def handle_client_connection(file_writer_queue: mp.Queue, sockets_queue: mp.Queu
                 client_sock.send_contestants(winners)
                 file_writer_queue.put(winners)
             except OSError as e:
-                logging.info("Error while reading socket: {}".format(str(e)))
+                logging.info("[Process {}] Error while reading socket: {}".format(process_id, str(e)))
                 handled_exception = True
             except ClosedSocket:
-                logging.info("Socket closed")
+                logging.info("[Process {}] Socket closed".format(process_id))
                 handled_exception = True
             except Exception as e:
-                logging.info("Error: {}".format(str(e)))
-                logging.info("Error traceback: {}".format(traceback.format_exc()))
+                logging.info("[Process {}] Error: {}".format(process_id, str(e)))
+                logging.info("[Process {}] Error traceback: {}".format(process_id, traceback.format_exc()))
                 handled_exception = True
                 client_sock.send_error_message(str(e))
             if handled_exception:
@@ -125,13 +127,6 @@ def handle_client_connection(file_writer_queue: mp.Queue, sockets_queue: mp.Queu
                 handled_exception = False
                 client_sock.close()
                 process_status.delete_connection()
-
-            # TODO: mover al sigterm handler
-            # sockets_queue.close()
-            # sockets_queue.join_thread()
-            # file_writer_queue.close()
-            # file_writer_queue.join_thread()
-
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -153,16 +148,16 @@ class Server:
         file_writer_queue = mp.Queue()
         sockets_queue = mp.Queue(client_processes_amount)
 
-        self.connection_status = MainProcessStatus(self._server_socket, file_writer_queue, sockets_queue)
+        self.connection_status = MainProcessStatus(0, self._server_socket, file_writer_queue, sockets_queue)
 
-        writer_process = mp.Process(target = update_winners_file, args = [file_writer_queue])
+        writer_process = mp.Process( target = update_winners_file, args = [1, file_writer_queue])
         writer_process.start()
 
         self.connection_status.add_children([writer_process])
 
         clients_processes = []
-        for _ in range(client_processes_amount):
-            client_process = mp.Process(target = handle_client_connection, args = [file_writer_queue, sockets_queue])
+        for i in range(client_processes_amount):
+            client_process = mp.Process(target = handle_client_connection, args = [i + 2, file_writer_queue, sockets_queue])
             client_process.start()
             clients_processes.append(client_process)
         # TODO: Modify this program to handle signal to graceful shutdown
@@ -171,7 +166,7 @@ class Server:
         while True:
             sockets_queue.put(self.__accept_new_connection())
             self.connection_status.delete_connection()
-            logging.info("Accepted new connection")
+            logging.info("[Process {}] Accepted new connection".format(0))
 
         # TODO: cerrar cola de file process en sigterm
 
