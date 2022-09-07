@@ -1,13 +1,34 @@
+from io import TextIOWrapper
 import socket
 import time
 import datetime
-# import logging
+import logging
 import common.constants as constants
+import signal
 import multiprocessing as mp
 
 """ Winners storage location. """
 STORAGE = "./winners"
 
+
+class FileWriterStatus:
+	def __init__(self, winners_queue):
+		self.winners_queue: mp.Queue = winners_queue
+		self.file: TextIOWrapper = None
+		signal.signal(signal.SIGTERM, self.free_resources)
+
+	def add_file(self, file):
+		self.file = file
+
+	def remove_file(self):
+		self.file = None
+
+	def free_resources(self, *args):
+		self.winners_queue.close()
+		self.winners_queue.join_thread()
+		logging.info("Closed file writer process queue")
+		if (not (self.file is None)):
+			self.file.close()
 
 """ Contestant data model. """
 class Contestant:
@@ -28,21 +49,19 @@ def is_winner(contestant: Contestant) -> bool:
 	time.sleep(0.001)
 	return hash(contestant) % 17 == 0
 
-
-
-
-
 """ Persist the information of each winner in the STORAGE file. Not thread-safe/process-safe. """
-def persist_winners(winners: "list[Contestant]") -> None:
+def persist_winners(status_manager: FileWriterStatus, winners: "list[Contestant]") -> None:
 	with open(STORAGE, 'a+') as file:
+		status_manager.add_file(file)
 		for winner in winners:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
-
+		status_manager.remove_file()
 
 def update_winners_file(winners_queue: mp.Queue):
+	status_manager = FileWriterStatus(winners_queue)
 	received_message = winners_queue.get()
 	while received_message != None:
-		persist_winners(received_message)
+		persist_winners(status_manager, received_message)
 		received_message = winners_queue.get()
 	winners_queue.close()
 	winners_queue.join_thread()

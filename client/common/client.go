@@ -103,7 +103,7 @@ func (c *Client) processBatch(batch_number *int, total_participants_amount *int,
 	}
 	*total_participants_amount += *sent_participants_amount
 	*winners_amount += len(result)
-	c.printBatchResult(*batch_number, result)
+	// c.printBatchResult(*batch_number, result)
 	*batch_number += 1
 	current_sent_participants_amount, has_file_finished, sending_err := c.manager.SendParticipants()
 	if sending_err != nil {

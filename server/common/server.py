@@ -5,81 +5,13 @@ import sys
 # import time
 import traceback
 import multiprocessing as mp
-import concurrent.futures as fut
-import threading
+import queue
 
 from common.utils import ClientSocket, ClosedSocket, is_winner, update_winners_file
 
 
-class AtomicVariable:
-    def __init__(self, value):
-        self.lock = threading.Lock()
-        self.value = value
-
-    def atomic_write(self, value):
-        self.lock.acquire()
-        self.value = value 
-        self.lock.release()
-
-    def atomic_read(self):
-        self.lock.acquire()
-        ret_value = self.value
-        self.lock.release()
-        return ret_value
-
-def await_closing_message(message_queue: mp.Queue, should_keep_iterating: AtomicVariable):
-    message_queue.get()
-    should_keep_iterating.atomic_write(False)
-
-
-def handle_client_connection(file_writer_queue: mp.Queue, connections_processors_queue: mp.Queue, client_sock: ClientSocket):
-    """
-    Read message from a specific client socket and closes the socket
-
-    If a problem arises in the communication with the client, the
-    client socket will also be closed
-    """
-    should_keep_iterating = AtomicVariable(True)
-
-     # Since this thread will just wait for the queue message, and the process has a
-     # lot of I/O operations, this thread should not affect performance
-    queue_reader_thread = threading.Thread(target = await_closing_message, args = (connections_processors_queue, should_keep_iterating))
-    queue_reader_thread.start()
-
-
-    try:
-        while should_keep_iterating.atomic_read():
-            contestants = client_sock.recv_contestants()
-
-            # BORRAR
-            # for contestant in contestants:
-            #     logging.info("First name: {}".format(contestant.first_name))
-            #     logging.info("Last name: {}".format(contestant.last_name))
-            #     logging.info("Document: {}".format(contestant.document))
-            #     logging.info("Birthdate name: {}".format(contestant.birthdate))
-
-            winners = filter(lambda contestant: is_winner(contestant), contestants)
-            # client_sock.send_lottery_result(is_winner(contestant))
-            client_sock.send_contestants(winners)
-            file_writer_queue.put(winners)
-    except OSError:
-        logging.info("Error while reading socket {}".format(client_sock))
-    except ClosedSocket:
-        logging.info("Socket closed unexpectedly")
-    except Exception as e:
-        logging.info("Error: {}".format(str(e)))
-        logging.info("Error traceback: {}".format(traceback.format_exc()))
-        client_sock.send_error_message(str(e))
-    finally:
-        client_sock.close()
-        connections_processors_queue.close()
-        connections_processors_queue.join_thread()
-        file_writer_queue.close()
-        file_writer_queue.join_thread()
-        queue_reader_thread.join()
-
-class ConnectionStatus:
-    def __init__(self, server_socket):
+class MainProcessStatus:
+    def __init__(self, server_socket, file_writer_queue, sockets_queue):
         self.current_connection = None
         self._server_socket = server_socket
         signal.signal(signal.SIGTERM, self.close_connection)
@@ -91,13 +23,104 @@ class ConnectionStatus:
         self.current_connection = None
 
     def close_connection(self, *args):
-        self._server_socket.close()
         logging.info("SIGTERM received")
+        self._server_socket.close()
         logging.info("Closed server socket")
         if (not (self.current_connection is None)):
             self.current_connection.close()
             logging.info("Closed dangling socket connection")
+        self.file_writer_queue.close()
+        self.file_writer_queue.join_thread()
+        logging.info("Closed file writer process queue")
+        self.sockets_queue.close()
+        self.sockets_queue.join_thread()
+        logging.info("Closed file sockets queue")
         sys.exit(143)
+
+class ClientProcessStatus:
+    def __init__(self, file_writer_queue, sockets_queue):
+        self.file_writer_queue: mp.Queue = file_writer_queue
+        self.sockets_queue: mp.Queue = sockets_queue
+        self.connection: ClientSocket = None
+        signal.signal(signal.SIGTERM, self.close_resources)
+
+    def add_connection(self, socket):
+        self.connection = socket
+
+    def delete_connection(self):
+        self.connection = None
+
+    def close_resources(self, *args):
+        logging.info("SIGTERM received")
+        if (not (self.connection is None)):
+            self.connection.close()
+            logging.info("Closed dangling socket connection")
+        self.file_writer_queue.close()
+        self.file_writer_queue.join_thread()
+        logging.info("Closed file writer process queue")
+        is_queue_empty = False
+        while (not is_queue_empty):
+            try:
+                self.sockets_queue.get_nowait().close()
+                logging.info("Closed dangling queue socket connection")
+            except queue.Empty:
+                is_queue_empty = True
+        self.sockets_queue.close()
+        self.sockets_queue.join_thread()
+        logging.info("Closed file sockets queue")
+        sys.exit(143)
+
+
+
+def handle_client_connection(file_writer_queue: mp.Queue, sockets_queue: mp.Queue):
+    """
+    Read message from a specific client socket and closes the socket
+
+    If a problem arises in the communication with the client, the
+    client socket will also be closed
+    """
+    # should_keep_iterating = AtomicVariable(True)
+
+     # Since this thread will just wait for the queue message, and the process has a
+     # lot of I/O operations, this thread should not affect performance
+
+    process_status = ClientProcessStatus(file_writer_queue, sockets_queue)
+
+    connection_is_alive = False
+    handled_exception = False
+    while True:
+        client_sock: ClientSocket = sockets_queue.get()
+        process_status.add_connection(client_sock)
+        connection_is_alive = True
+        while connection_is_alive:
+            try:
+                contestants = client_sock.recv_contestants()
+                winners = list(filter(is_winner, contestants))
+                client_sock.send_contestants(winners)
+                file_writer_queue.put(winners)
+            except OSError as e:
+                logging.info("Error while reading socket: {}".format(str(e)))
+                handled_exception = True
+            except ClosedSocket:
+                logging.info("Socket closed")
+                handled_exception = True
+            except Exception as e:
+                logging.info("Error: {}".format(str(e)))
+                logging.info("Error traceback: {}".format(traceback.format_exc()))
+                handled_exception = True
+                client_sock.send_error_message(str(e))
+            if handled_exception:
+                connection_is_alive = False
+                handled_exception = False
+                client_sock.close()
+                process_status.delete_connection()
+
+            # TODO: mover al sigterm handler
+            # sockets_queue.close()
+            # sockets_queue.join_thread()
+            # file_writer_queue.close()
+            # file_writer_queue.join_thread()
+
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -105,7 +128,6 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self.connection_status = ConnectionStatus(self._server_socket)
 
     def run(self):
         """
@@ -115,32 +137,27 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
+        client_processes_amount = max(mp.cpu_count() - 2, 1)
+
         file_writer_queue = mp.Queue()
-        connections_processors_queue = mp.Queue()
+        sockets_queue = mp.Queue(client_processes_amount)
 
-        mp.Process(target = update_winners_file, args = [file_writer_queue])
+        self.connection_status = MainProcessStatus(self._server_socket, file_writer_queue, sockets_queue)
 
-        pools_available_processes = mp.cpu_count() - 2
-        processors_pool = fut.ProcessPoolExecutor(pools_available_processes) # Since we will have this and the file writer processes
+        writer_process = mp.Process(target = update_winners_file, args = [file_writer_queue])
+        writer_process.start()
 
+        clients_processes = []
+        for _ in range(client_processes_amount):
+            client_process = mp.Process(target = handle_client_connection, args = [file_writer_queue, sockets_queue])
+            client_process.start()
+            clients_processes.append(client_process)
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        not_done_tasks = []
         while True:
-            while len(not_done_tasks) < pools_available_processes:
-                client_sock = self.__accept_new_connection()
-                # handle_client_connection(connections_processors_queue, client_sock)
-                # not_done_tasks.append(processors_pool.submit(handle_client_connection, file_writer_queue, connections_processors_queue, client_sock, print_queue))
-                future = processors_pool.submit(handle_client_connection, file_writer_queue, connections_processors_queue, client_sock, print_queue)
-                # future = processors_pool.submit(handle_client_connection, 3, 3, 3, 3, 3)
-                logging.info("Future is running {}".format(future.running()))
-                
-                not_done_tasks.append(future)
-                # logging.info("Voy a leer del print queue")
-                # logging.info(print_queue.get())
-                # logging.info("Lei del print queue")
-            _, not_done_tasks = fut.wait(not_done_tasks, return_when = fut.FIRST_COMPLETED)
-            # _, not_done_tasks = fut.wait(not_done_tasks, return_when = fut.FIRST_COMPLETED)
+            sockets_queue.put(self.__accept_new_connection())
+            logging.info("Accepted new connection")
+
         # TODO: cerrar cola de file process en sigterm
 
 
