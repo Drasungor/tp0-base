@@ -6,6 +6,7 @@ import logging
 import common.constants as constants
 import signal
 import multiprocessing as mp
+import sys
 
 """ Winners storage location. """
 STORAGE = "./winners"
@@ -29,6 +30,8 @@ class FileWriterStatus:
 		logging.info("Closed file writer process queue")
 		if (not (self.file is None)):
 			self.file.close()
+			logging.info("Closed file writer file")
+		sys.exit(143)
 
 """ Contestant data model. """
 class Contestant:

@@ -67,7 +67,7 @@ class ClientProcessStatus:
                 is_queue_empty = True
         self.sockets_queue.close()
         self.sockets_queue.join_thread()
-        logging.info("Closed file sockets queue")
+        logging.info("Closed sockets queue")
         sys.exit(143)
 
 
