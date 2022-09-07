@@ -46,6 +46,9 @@ class MainProcessStatus:
         self.sockets_queue.join_thread()
         logging.info("[Process {}] Closed file sockets queue".format(self.process_id))
         logging.info("[Process {}] Exiting main process".format(self.process_id))
+        for child in self.processes:
+            child.join()
+        logging.info("[Process {}] Joined all child processes".format(self.process_id))
         sys.exit(143)
 
 class ClientProcessStatus:
@@ -185,3 +188,5 @@ class Server:
         self.connection_status.add_connection(c)
         logging.info('Got connection from {}'.format(addr))
         return ClientSocket(c)
+
+
