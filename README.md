@@ -74,6 +74,7 @@ Para resolver este ejercicio se creó un script en go que ejecuta un enviado del
 ### Ejercicio N°4:
 Modificar el cliente y el servidor para que el programa termine de forma gracefully al recibir la signal SIGTERM. Terminar la aplicación de forma gracefully implica que todos los sockets y threads/procesos de la aplicación deben cerrarse/joinearse antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker-compose down`).
 
+
 ## Parte 2: Repaso de Comunicación y Sincronización
 
 En esta segunda parte del trabajo práctico se plantea un caso de uso denominado **Lotería Nacional** descompuesto en tres ejercicios. Para la resolución de los mismos deberán utilizarse como base tanto los clientes como el servidor introducidos en la primera parte, con las modificaciones agregadas en el quinto ejercicio.
