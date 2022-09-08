@@ -129,6 +129,15 @@ En este ejercicio el cliente se conecta al servidor, envía un batch de particip
 
 Al pasar de enviarse un único participante a enviar y recibir un array, se debió realizar cambios en el protocolo de comunicación. Para pasar a enviar el array se decidió establecer el número delimitador `0xFFFFFFFF` (4 bytes), que permite indicarle al recibidor que luego de este no recibirá más participantes en ese batch. La forma de serializar un participante particular no fue modificada, por lo que el número delimitador será tomado como un set de bytes más si está en el medio de un string (ya sea porque se usa intencionalmente o por error de posicionamiento del delimitador). Cuando se está por leer un participante se lee primero el tamaño del primer string, si es el número delimitador entonces se sabe que no vendrán más participantes, sino se procede a leer el participante como ya se hacía previamente (el número leído termina siendo el largo del string del nombre del participante).
 
+Esto aplica tanto para el enviado de participantes del cliente al servidor como para el enviado de ganadores del servidor al cliente, utilizan el mismo protocolo, remplazando así la respuesta booleana que se utilizaba antes para el enviado de un único participante.
+
+Un flujo normal de comunicación de un batch sin errores entre cliente y servidor sería el siguiente:
+
+cliente -> | 0 | Participant 1 | Participant 2 | ... | Participant n | 0xFFFFFFFF | -> servidor
+cliente <- | 0 | Winner 1 | Winner 2 | ... | Winner m | 0xFFFFFFFF | <- servidor
+
+El manejo de SIGTERM continúa sin tener cambios para la liberación de recursos, con la diferencia de que se vuelve a leer en loop de forma no bloqueante el  channel de la señal en el cliente.
+
 ### Ejercicio N°7:
 Modificar el servidor actual para que el mismo permita procesar mensajes y aceptar nuevas conexiones en paralelo. Además, deberá comenzar a persistir la información de los ganadores utilizando la función provista `persist_winners(...)`. Considerar los mecanismos de sincronización a utilizar para el correcto funcionamiento de dicha persistencia.
 
