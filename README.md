@@ -121,7 +121,7 @@ Es necesario aclarar que, al ser el código de error sobre lógica de aplicació
 ### Ejercicio N°6:
 Modificar los clientes para que levanten los datos de los participantes desde los datasets provistos en los archivos de prueba en lugar de las variables de entorno. Cada cliente deberá consultar por todas las personas de un mismo set (los cuales representan a los jugadores de cada agencia) en forma de batch, de manera de poder hacer varias consultas en un solo request. El servidor por otro lado deberá responder con los datos de todos los ganadores del batch, y cada cliente al finalizar las consultas deberá loguear el porcentaje final de jugadores que hayan ganado en su agencia.
 
-Para facilitar la representación de los bytes del protocolo, se representará al conjunto de bytes | string first name | string last name | string document | string birthdate | como | Participant |  
+Para facilitar la representación de los bytes del protocolo, se representará al conjunto de bytes | string first name | string last name | string document | string birthdate | como | Participant | o | Winner |  
 
 Para la implementación de este ejercicio se tuvo que leer de un archivo csv, donde se encontraban todos los participantes a procesar. Se incluyó la lectura y enviado de participantes en la abstracción de procesamiento de participantes (clase `ParticipantsManager`). El dataset que utiliza cada cliente, junto con la cantidad de participantes por batch es configurada en variables de entorno en el archivo de docker-compose.
 
@@ -143,10 +143,16 @@ Modificar el servidor actual para que el mismo permita procesar mensajes y acept
 
 En caso de que el alumno desee implementar un nuevo servidor en Python,  deberán tenerse en cuenta las [limitaciones propias del lenguaje](https://wiki.python.org/moin/GlobalInterpreterLock).
 
+Para resolver este ejercicio no se realizaron modificaciones en el protocolo. Se resolvió lo pedido creando procesos que leen de una cola sockets de clientes aceptados, en los que se realiza el mismo procedimiento que en el ejercicio 6. La diferencia en este caso consiste en que, además de responder los ganadores que resultaron del batch, estos deben persistirse en un archivo. Para lograrlo, se creó un proceso escritor cuya única tarea es leer listas de ganadores de una cola y escribirlas en el archivo al cual únicamente él tiene acceso. De esta forma los distintos procesos envían concurrentemente ganadores para persistir, pero estos son persistidos de forma serial por un único proceso.
+
+En este ejercicio sí se realizaron cambios en la liberación de recursos al recibir un SIGTERM, en el servidor. Al utilizarse colas bloqueantes para comunicación entre procesos, y procesos en sí, al recibir un sigterm cada proceso debe asegurarse de cerrar bien todas sus colas de comunicación. Además de esto los clientes deben asegurarse de cerrar la conexión que estén manejando actualmente, y de consumir y cerrar todas las conexiones pendientes que queden en la cola de enviado de sockets. Para el caso del proceso principal, además del cerrado de colas y sockets, se debe hacer un join de todos los procesos que generó.
+
 ### Ejercicio N°8:
 Agregar en los clientes una consulta por el número total de ganadores de todas las agencias, por lo cual se deberá modificar el servidor para poder llevar el trackeo de dicha información.
 
 En caso de que alguna agencia consulte a la central antes de que esta haya completado el procesamiento de las demás, deberá recibir una respuesta parcial con el número de agencias que aún no hayan finalizado su carga de datos y volver a consultar tras N segundos.
+
+
 
 ## Consideraciones Generales
 Se espera que los alumnos realicen un fork del presente repositorio para el desarrollo de los ejercicios, el cual deberá contar con un README que explique cómo correr cada uno de estos. Para la segunda parte del TP también será necesaria una sección donde se explique el protocolo de comunicación implementado y los mecanismos de sincronización utilizado en el último ejercicio. Finalmente, se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección provistos [en el campus](https://campus.fi.uba.ar/course/view.php?id=761).
