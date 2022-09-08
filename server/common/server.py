@@ -148,9 +148,8 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self.accumulated_winners_amount= 0
-        self.dispatched_winners_processings = 0
-        self.completed_winners_processings = 0
+        self.accumulated_winners_amount = 0
+        self.active_processes = 0
 
     def run(self):
         """
@@ -183,9 +182,7 @@ class Server:
         self.main_process_status.add_children(clients_processes)
         while True:
             new_connection = self.__accept_new_connection()
-            sockets_queue.put(new_connection)
-            self.main_process_status.delete_connection()
-            logging.info("[Process {}] Accepted new connection".format(0))
+            self.__process_connection(new_connection, sockets_queue, processes_return_queue)
 
 
     def __accept_new_connection(self) -> ClientSocket:
@@ -204,14 +201,24 @@ class Server:
         return ClientSocket(c)
 
 
-    def __process_connection(socket: ClientSocket, sockets_queue, processes_return_queue):
+    def __process_connection(self, socket: ClientSocket, sockets_queue: mp.Queue, processes_return_queue: mp.Queue):
         connection_type = socket.read_connection_type()
         if (connection_type == "evaluation"):
-            # Normal code execution
-            pass
+            self.active_processes += 1
+            sockets_queue.put(socket)
+            self.main_process_status.delete_connection()
         elif (connection_type == "amount"):
-            # Count etc, new logic
-            pass
+            is_queue_empty = False
+            while (not is_queue_empty):
+                try:
+                    self.accumulated_winners_amount += processes_return_queue.get_nowait()
+                    self.active_processes -= 1
+                except queue.Empty:
+                    is_queue_empty = True
+            if (self.active_processes != 0):
+                socket.send_amount_result(self.active_processes, True)
+            else:
+                socket.send_amount_result(self.accumulated_winners_amount, False)
         else:
             # Send error
             pass

@@ -141,6 +141,12 @@ class ClientSocket:
 			self.__send_string(str(contestant.birthdate.date()))
 		self.socket.sendall(constants.last_participant_delimiter.to_bytes(constants.attributes_length_bytes_amount, "big"))
 
+	def send_amount_result(self, amount: int, exist_dangling_processes: bool):
+		self.socket.sendall(amount.to_bytes(constants.int_32_size, "big"))
+		finisher = constants.is_final_answer
+		if (exist_dangling_processes):
+			finisher = constants.connections_still_exist
+		self.socket.sendall(finisher.to_bytes(constants.bool_bytes_amount, "big"))
 
 	def read_connection_type(self):
 		connection_type = self.__read_connection_type_code()
