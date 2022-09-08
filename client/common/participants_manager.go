@@ -40,10 +40,11 @@ type Participant struct {
 }
 
 type ParticipantsManager struct {
-	conn   net.Conn
-	config ClientConfig
-	fileReader *csv.Reader
-	file_ptr *os.File
+	conn        net.Conn
+	config      ClientConfig
+	fileReader  *csv.Reader
+	file_ptr    *os.File
+	closed      bool
 }
 
 func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
@@ -65,6 +66,7 @@ func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
 		config: config,
 		fileReader: csv.NewReader(file),
 		file_ptr: file,
+		closed: false,
 	}
 	return manager, nil
 }
@@ -213,10 +215,17 @@ func (p *ParticipantsManager) ReceiveWinningParticipants() ([]Participant, bool,
 }
 
 func (p *ParticipantsManager) CloseConnection() error {
-	err := p.file_ptr.Close()
-	if err != nil {
-		p.conn.Close()
-		return err
+	if !p.closed {
+		err := p.file_ptr.Close()
+		if err != nil {
+			p.conn.Close()
+			return err
+		}
+		err = p.conn.Close()
+		if err != nil {
+			return err
+		}
+		p.closed = true
 	}
-	return p.conn.Close()
+	return nil
 }

@@ -121,15 +121,15 @@ func ask_for_winners_amount(sync_channel chan bool, client_id string, sleep_time
 	should_keep_iterating := true
 	for should_keep_iterating {
 		received_amount, is_final_value, err := results_manager.getWinnersAmount()
-		if err == nil {
+		if err != nil {
 			should_keep_iterating = false
 			log.Infof("[CLIENT %v] Communication error in results manager thread: %v", client_id, err)
 		}
 		if is_final_value {
 			should_keep_iterating = false
-			log.Infof("[CLIENT %v] Total winners amount: %d", received_amount)
+			log.Infof("[CLIENT %v] Total winners amount: %d", client_id, received_amount)
 		} else {
-			log.Infof("[CLIENT %v] Processing agencies left: %d", received_amount)
+			log.Infof("[CLIENT %v] Processing agencies left: %d", client_id, received_amount)
 			time.Sleep(time.Second * time.Duration(sleep_time))
 		}
 		select {
@@ -193,4 +193,6 @@ func (c *Client) StartClientLoop() {
 	log.Infof("[CLIENT %v] Winners amount: %d", c.config.ID, winners_amount)
 	log.Infof("[CLIENT %v] Total participants amount: %d", c.config.ID, total_participants_amount)
 	log.Infof("[CLIENT %v] Finished participants evaluations, winner rate is: %f", c.config.ID, float32(winners_amount)/float32(total_participants_amount))
+	closeParticipantsManager(c)
+	<- sync_channel
 }
