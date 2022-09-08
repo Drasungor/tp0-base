@@ -149,6 +149,6 @@ func (c *Client) StartClientLoop() {
 		default:
 		}
 	}
-	log.Infof("[CLIENT %v] Winners amount: %f", c.config.ID, winners_amount)
+	log.Infof("[CLIENT %v] Winners amount: %d", c.config.ID, winners_amount)
 	log.Infof("[CLIENT %v] Finished participants evaluations, winner rate is: %f", c.config.ID, float32(winners_amount)/float32(total_participants_amount))
 }

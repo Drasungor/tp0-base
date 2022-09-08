@@ -1,19 +1,13 @@
 package common
 
 import (
-	// "bufio"
 	"fmt"
 	"net"
-	// "time"
 	"os"
-    // "os/signal"
-    // "syscall"
 	"encoding/binary"
 	"io"
 	"errors"
 	"encoding/csv"
-	// "golang.org/x/text/encoding/charmap"
-	// log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -21,7 +15,6 @@ const message_type_code_bytes_amount = 1
 const normal_message_code = 0
 const error_message_code = 1
 const last_participant_delimiter = 0xFFFFFFFF
-// const bool_bytes_amount = 1
 
 
 type Participant struct {
@@ -119,7 +112,6 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil {
 		for _, data := range line_data {
 			err = p.sendString(data)
-			// log.Infof("csv line : %v", data)
 			if err != nil {
 				return read_lines_amount, false, err
 			}
