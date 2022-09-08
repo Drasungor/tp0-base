@@ -95,7 +95,7 @@ Deberá implementarse un módulo de comunicación entre el cliente y el servidor
 * Correcto encapsulamiento entre el modelo de dominio y la capa de transmisión.
 * Empleo correcto de sockets, incluyendo manejo de errores y evitando el fenómeno conocido como _short-read_.
 
-Para la resolución de este ejercicio se implementaron tanto en el servidor como en el clientes abstracciones de enviado de mensajes serializados que contienen datos de un cliente. Para que estos pudiesen comunicarse correctamente entre sí se armó un protocolo, el cual se describe a continuación.
+Para la resolución de este ejercicio se implementaron tanto en el servidor como en el clientes abstracciones de enviado de mensajes serializados que contienen datos de un cliente. Estos se usaron para generar una interfaz que oculte la comunicación por sockets, y que cada programa pueda preocuparse en el alto nivel únicamente por la lógica del programa (definir si un usuario ganó o no, imprimir por pantalla el resultado, etc). Para que estos pudiesen comunicarse correctamente entre sí se armó un protocolo, el cual se describe a continuación.
 
 En una conexión puede enviarse información de un cliente o un mensaje de error, por esto se comienza enviando 1 byte que indica de qué tipo de mensaje se trata. En caso de enviarse un mensaje que contenga datos del participante a evaluar se enviará el código 0, y en caso de que se quiera enviar un mensaje de error se enviará el código 1.  
 
@@ -118,6 +118,10 @@ No se realizaron modificaciones en el manejo de recursos con SIGTERM tanto en el
 
 ### Ejercicio N°6:
 Modificar los clientes para que levanten los datos de los participantes desde los datasets provistos en los archivos de prueba en lugar de las variables de entorno. Cada cliente deberá consultar por todas las personas de un mismo set (los cuales representan a los jugadores de cada agencia) en forma de batch, de manera de poder hacer varias consultas en un solo request. El servidor por otro lado deberá responder con los datos de todos los ganadores del batch, y cada cliente al finalizar las consultas deberá loguear el porcentaje final de jugadores que hayan ganado en su agencia.
+
+Para facilitar la representación de los bytes del protocolo, se representará al conjunto de bytes | string first name | string last name | string document | string birthdate | como | Participant |  
+
+Para la implementación de este ejercicio se tuvo que leer de un archivo csv, donde se encontraban todos los participantes a procesar
 
 ### Ejercicio N°7:
 Modificar el servidor actual para que el mismo permita procesar mensajes y aceptar nuevas conexiones en paralelo. Además, deberá comenzar a persistir la información de los ganadores utilizando la función provista `persist_winners(...)`. Considerar los mecanismos de sincronización a utilizar para el correcto funcionamiento de dicha persistencia.
