@@ -219,6 +219,9 @@ class Server:
                 socket.send_amount_result(self.active_processes, True)
             else:
                 socket.send_amount_result(self.accumulated_winners_amount, False)
+            socket.close()
+            self.main_process_status.delete_connection()
         else:
-            # Send error
-            pass
+            socket.send_error_message("Unexpected connection type")
+            socket.close()
+            self.main_process_status.delete_connection()
