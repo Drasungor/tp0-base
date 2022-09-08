@@ -116,12 +116,18 @@ cliente <- | 0 | string descriptivo con el error | <- servidor
 
 No se realizaron modificaciones en el manejo de recursos con SIGTERM tanto en el cliente como en el servidor, aunque el cliente, al enviar ahora un único mensaje, chequea por SIGTERM únicamente luego de terminar la conversación.
 
+Es necesario aclarar que, al ser el código de error sobre lógica de aplicación, no se puede enviar en el medio del protocolo, será interpretado como un byte más del mensaje.
+
 ### Ejercicio N°6:
 Modificar los clientes para que levanten los datos de los participantes desde los datasets provistos en los archivos de prueba en lugar de las variables de entorno. Cada cliente deberá consultar por todas las personas de un mismo set (los cuales representan a los jugadores de cada agencia) en forma de batch, de manera de poder hacer varias consultas en un solo request. El servidor por otro lado deberá responder con los datos de todos los ganadores del batch, y cada cliente al finalizar las consultas deberá loguear el porcentaje final de jugadores que hayan ganado en su agencia.
 
 Para facilitar la representación de los bytes del protocolo, se representará al conjunto de bytes | string first name | string last name | string document | string birthdate | como | Participant |  
 
-Para la implementación de este ejercicio se tuvo que leer de un archivo csv, donde se encontraban todos los participantes a procesar
+Para la implementación de este ejercicio se tuvo que leer de un archivo csv, donde se encontraban todos los participantes a procesar. Se incluyó la lectura y enviado de participantes en la abstracción de procesamiento de participantes (clase `ParticipantsManager`). El dataset que utiliza cada cliente, junto con la cantidad de participantes por batch es configurada en variables de entorno en el archivo de docker-compose.
+
+En este ejercicio el cliente se conecta al servidor, envía un batch de participantes, espera a la respuesta que indica los datos de los participantes que ganaron la lotería, los imprime por pantalla, y vuelve a repetir este proceso. Esto se realiza hasta que haya algún error o se termine el archivo que se quiere procesar, momento en el cual se imprime por pantalla la proporción de usuarios que ganó la lotería.
+
+Al pasar de enviarse un único participante a enviar y recibir un array, se debió realizar cambios en el protocolo de comunicación. Para pasar a enviar el array se decidió establecer el número delimitador `0xFFFFFFFF` (4 bytes), que permite indicarle al recibidor que luego de este no recibirá más participantes en ese batch. La forma de serializar un participante particular no fue modificada, por lo que el número delimitador será tomado como un set de bytes más si está en el medio de un string (ya sea porque se usa intencionalmente o por error de posicionamiento del delimitador). Cuando se está por leer un participante se lee primero el tamaño del primer string, si es el número delimitador entonces se sabe que no vendrán más participantes, sino se procede a leer el participante como ya se hacía previamente (el número leído termina siendo el largo del string del nombre del participante).
 
 ### Ejercicio N°7:
 Modificar el servidor actual para que el mismo permita procesar mensajes y aceptar nuevas conexiones en paralelo. Además, deberá comenzar a persistir la información de los ganadores utilizando la función provista `persist_winners(...)`. Considerar los mecanismos de sincronización a utilizar para el correcto funcionamiento de dicha persistencia.
