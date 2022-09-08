@@ -154,7 +154,26 @@ En caso de que alguna agencia consulte a la central antes de que esta haya compl
 
 Para realizar este ejercicio se agregó en el cliente una goroutine que se encarga de cada N segundos (configurable en el archivo de docker compose) abre una conexión, pide información sobre la cantidad total de ganadores, y cierra la conexión. Esto lo hace mientras reciba que faltan conexiones por procesar, una vez que reciba la cantidad final de ganadores dejará de mandar estos mensajes.
 
-Como para enviar el pedido de la cantidad de ganadores se abre una nueva conexión cada vez, se modificó el protocolo para que, al comenzar una conexión entre el cliente y el servidor, el cliente envíe 1 byte que indique si es una conexión para procesar participantes (enviando el número 0) o para obtener la cantidad total de ganadores (enviando el número 0). En caso de que se trate de una conexión para procesamiento de participantes se envía el socket a la cola de sockets para que sea procesado por los procesos hijos, en caso de que se trate de una conexión para conseguir la cantidad de ganadores se ve si quedan o no procesos por terminar (lo cual se trackea utilizando una cola en la que los procesos van enviando la cantidad de ganadores que resultaron de procesar su última conexión), y envían según esto la cantidad de ganadores totales o la cantidad de procesos que faltan terminar. Para este último mensaje se envía un número de 4 bytes big endian, seguido por 1 byte que vale 1 si es una respuesta final (terminaron de procesar conexiones todos los clientes) y vale 0 si todavía hay procesos traabajando con clientes.
+Como para enviar el pedido de la cantidad de ganadores se abre una nueva conexión cada vez, se modificó el protocolo para que, al comenzar una conexión entre el cliente y el servidor, el cliente envíe 1 byte que indique si es una conexión para procesar participantes (enviando el número 0) o para obtener la cantidad total de ganadores (enviando el número 0). En caso de que se trate de una conexión para procesamiento de participantes se envía el socket a la cola de sockets para que sea procesado por los procesos hijos, en caso de que se trate de una conexión para conseguir la cantidad de ganadores se ve si quedan o no procesos por terminar (lo cual se trackea utilizando una cola en la que los procesos van enviando la cantidad de ganadores que resultaron de procesar su última conexión), y envían según esto la cantidad de ganadores totales o la cantidad de procesos que faltan terminar. Para este último mensaje se envía un número de 4 bytes big endian, seguido por 1 byte que vale 1 si es una respuesta final (terminaron de procesar conexiones todos los clientes) y vale 0 si todavía hay procesos trabajando con clientes.  
+
+Ejemplos de posibles flujos de mensajes son los siguientes:  
+- Procesamiento de participantes:  
+cliente -> | 0 | 0 | Participant 1 | Participant 2 | ... | Participant n | 0xFFFFFFFF | -> servidor  
+cliente <- | 0 | Winner 1 | Winner 2 | ... | Winner m | 0xFFFFFFFF | <- servidor  
+cliente -> | 0 | Participant 1 | Participant 2 | ... | Participant n | 0xFFFFFFFF | -> servidor  
+cliente <- | 0 | Winner 1 | Winner 2 | ... | Winner m | 0xFFFFFFFF | <- servidor  
+...  
+Notar que únicamente en el primer mensaje del cliente se envía el byte que indica el tipo de conexión.  
+
+- Obtención de cantidad de ganadores con procesos trabajando:  
+cliente -> | 1 | -> servidor  
+cliente <- | cantidad de trabajadores | 0 | <- servidor  
+
+- Obtención de cantidad de ganadores sin procesos trabajando:  
+cliente -> | 1 | -> servidor  
+cliente <- | cantidad de ganadores | 1 | <- servidor  
+
+Al haber ahora una cola más en el servidor se debe tener en cuenta a la hora de procesar el SIGTERM. Por otro lado, en el cliente se debe esperar a que finalice la ejecución de la goroutine que se encarga de pedir la cantidad de ganadores, por lo que al recibir SIGTERM se le envía por un channel que se chequea luego de cada consulta al server que debe terminar su ejecución, y luego se utiliza ese mismo channel para esperar a que esta goroutine termine de ejecutarse, esperando a que envíe un mensaje al momento de terminar de ejecutarse. 
 
 ## Consideraciones Generales
 Se espera que los alumnos realicen un fork del presente repositorio para el desarrollo de los ejercicios, el cual deberá contar con un README que explique cómo correr cada uno de estos. Para la segunda parte del TP también será necesaria una sección donde se explique el protocolo de comunicación implementado y los mecanismos de sincronización utilizado en el último ejercicio. Finalmente, se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección provistos [en el campus](https://campus.fi.uba.ar/course/view.php?id=761).
