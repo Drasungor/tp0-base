@@ -95,6 +95,27 @@ Deberá implementarse un módulo de comunicación entre el cliente y el servidor
 * Correcto encapsulamiento entre el modelo de dominio y la capa de transmisión.
 * Empleo correcto de sockets, incluyendo manejo de errores y evitando el fenómeno conocido como _short-read_.
 
+Para la resolución de este ejercicio se implementaron tanto en el servidor como en el clientes abstracciones de enviado de mensajes serializados que contienen datos de un cliente. Para que estos pudiesen comunicarse correctamente entre sí se armó un protocolo, el cual se describe a continuación.
+
+En una conexión puede enviarse información de un cliente o un mensaje de error, por esto se comienza enviando 1 byte que indica de qué tipo de mensaje se trata. En caso de enviarse un mensaje que contenga datos del participante a evaluar se enviará el código 0, y en caso de que se quiera enviar un mensaje de error se enviará el código 1.  
+
+Antes de explicar los mensajes que siguen al código de tipo de mensaje, es necesario aclarar que los strings son enviados con un encoding de tipo utf-8, y son precedidos por su largo en cantidad de bytes, escrito en un número de 4 bytes en big endian, de la siguiente forma: | 4 bytes big endian | string utf8 |
+
+Dicho esto, lo que sigue al código de mensaje es:  
+- Código 1: lo sigue un string que indica el error que tuvo lugar. El tipo de error a enviar es lógico de aplicación, no de comunicación de sockets. En esta implementación es utilizado únicamente por el servidor para indicarle al cliente si una fecha se recibió en un formato no procesable. Un mensaje de este tipo sería el siguiente: | 1 | string de error |, tomando en cuenta la forma de enviar strings mencionada previamente.
+- Código 0: si lo recibe el servidor, se envía en forma de string los 4 datos del cliente, en orden First name, Last name, Document, Birthdate. Un mensaje de este tipo sería el siguiente: | 0 | string first name | string last name | string document | string birthdate |, tomando siempre en cuenta la forma de enviar strings explicada previamente. Si por otro lado lo recibe el cliente, entonces al código le seguirá 1 byte que indica si el participante enviado previamente ganó o no, siendo 1 el valor que indica que ganó, y 0 el que indica que no.  
+
+Los posibles flujos de mensajes son los siguientes:  
+- Sin errores:  
+cliente -> | 0 | string first name | string last name | string document | string birthdate | -> servidor  
+cliente <- | 0 | 0 o 1 según perdió o ganó | <- servidor  
+
+- Con error en birthdate:
+cliente -> | 0 | string first name | string last name | string document | string birthdate | -> servidor  
+cliente <- | 0 | string descriptivo con el error | <- servidor  
+
+No se realizaron modificaciones en el manejo de recursos con SIGTERM tanto en el cliente como en el servidor, aunque el cliente, al enviar ahora un único mensaje, chequea por SIGTERM únicamente luego de terminar la conversación.
+
 ### Ejercicio N°6:
 Modificar los clientes para que levanten los datos de los participantes desde los datasets provistos en los archivos de prueba en lugar de las variables de entorno. Cada cliente deberá consultar por todas las personas de un mismo set (los cuales representan a los jugadores de cada agencia) en forma de batch, de manera de poder hacer varias consultas en un solo request. El servidor por otro lado deberá responder con los datos de todos los ganadores del batch, y cada cliente al finalizar las consultas deberá loguear el porcentaje final de jugadores que hayan ganado en su agencia.
 
