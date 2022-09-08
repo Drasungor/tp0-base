@@ -74,6 +74,11 @@ Para resolver este ejercicio se creó un script en go que ejecuta un enviado del
 ### Ejercicio N°4:
 Modificar el cliente y el servidor para que el programa termine de forma gracefully al recibir la signal SIGTERM. Terminar la aplicación de forma gracefully implica que todos los sockets y threads/procesos de la aplicación deben cerrarse/joinearse antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker-compose down`).
 
+Para resolver este ejercicio se debió implementar el manejo de SIGTERM tanto en el cliente como en el servidor. Las explicaciones de las implementaciones realizadas son las siguientes:  
+
+- Servidor: al ser implementado en python, el manejo de SIGTERM se da implementando una función handler que se ejecutará cuando se reciba la señal. Debido a esto se creo la clase `ConnectionStatus`, cuya instancia se encarga de almacenar el accepter socket del server, e ir guardando y descartando los sockets de nuevas conexiones a medida que son aceptadas. Se define como handler de SIGTERM su método `close_connection`, donde se hace un cierre del accepter socket y del client socket (accesibles ya que el handler es un método de `ConnectionStatus`, por lo que se pueden acceder a sus atributos), en caso de que este último se encuentre presente. Una vez cerrados todos los recursos se cierra el programa con el código 143, que es el de sigterm.
+
+- Cliente: al ser implementado en go, el manejo de SIGTERM se da creando una cola configurada de forma tal que espera al enviado de SIGTERM al programa. En la implementación del cliente se realiza un manejo de recursos distinto al del servidor. Al tratarse de una lectura de un channel y no de un cambio de contexto de ejecución, se decidió hacer una lectura no bloqueante del canal al final de cada iteración del loop de conexiones del cliente (aquel de la función `StartClientLoop`. En caso de leerse algo del channel se procede a cerrar el programa (no se cierran los recursos ya que se posicionó el handler de forma tal que en caso de tener que ejecutarse los programas ya estarán cerrados) con el código 143.
 
 ## Parte 2: Repaso de Comunicación y Sincronización
 
