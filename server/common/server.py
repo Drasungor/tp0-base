@@ -11,8 +11,9 @@ from common.utils import ClientSocket, ClosedSocket, is_winner, update_winners_f
 
 
 class MainProcessStatus:
-    def __init__(self, process_id, server_socket, file_writer_queue, sockets_queue):
+    def __init__(self, process_id, server_socket, file_writer_queue, sockets_queue, processes_return_queue):
         self.current_connection = None
+        self.processes_return_queue = processes_return_queue
         self.process_id = process_id
         self._server_socket = server_socket
         self.file_writer_queue = file_writer_queue 
@@ -45,6 +46,9 @@ class MainProcessStatus:
         self.sockets_queue.close()
         self.sockets_queue.join_thread()
         logging.info("[Process {}] Closed file sockets queue".format(self.process_id))
+        self.processes_return_queue.close()
+        self.processes_return_queue.join_thread()
+        logging.info("[Process {}] Closed processes return queue".format(self.process_id))
         for child in self.processes:
             child.join()
         logging.info("[Process {}] Joined all child processes".format(self.process_id))
@@ -52,9 +56,10 @@ class MainProcessStatus:
         sys.exit(143)
 
 class ClientProcessStatus:
-    def __init__(self, process_id, file_writer_queue, sockets_queue):
+    def __init__(self, process_id, file_writer_queue, sockets_queue, processes_return_queue):
         self.file_writer_queue: mp.Queue = file_writer_queue
         self.sockets_queue: mp.Queue = sockets_queue
+        self.processes_return_queue = processes_return_queue
         self.process_id = process_id
         self.connection: ClientSocket = None
         signal.signal(signal.SIGTERM, self.close_resources)
@@ -73,6 +78,9 @@ class ClientProcessStatus:
         self.file_writer_queue.close()
         self.file_writer_queue.join_thread()
         logging.info("[Process {}] Closed file writer process queue".format(self.process_id))
+        self.processes_return_queue.close()
+        self.processes_return_queue.join_thread()
+        logging.info("[Process {}] Closed processes return queue".format(self.process_id))
         is_queue_empty = False
         while (not is_queue_empty):
             try:
@@ -88,7 +96,7 @@ class ClientProcessStatus:
 
 
 
-def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, sockets_queue: mp.Queue):
+def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, sockets_queue: mp.Queue, processes_return_queue: mp.Queue):
     """
     Read message from a specific client socket and closes the socket
 
@@ -100,7 +108,7 @@ def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, socke
      # Since this thread will just wait for the queue message, and the process has a
      # lot of I/O operations, this thread should not affect performance
 
-    process_status = ClientProcessStatus(process_id, file_writer_queue, sockets_queue)
+    process_status = ClientProcessStatus(process_id, file_writer_queue, sockets_queue, processes_return_queue)
 
     connection_is_alive = False
     handled_exception = False
@@ -108,10 +116,12 @@ def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, socke
         client_sock: ClientSocket = sockets_queue.get()
         process_status.add_connection(client_sock)
         connection_is_alive = True
+        winners_amount = 0
         while connection_is_alive:
             try:
                 contestants = client_sock.recv_contestants()
                 winners = list(filter(is_winner, contestants))
+                winners_amount += len(winners)
                 client_sock.send_contestants(winners)
                 file_writer_queue.put(winners)
             except OSError as e:
@@ -128,6 +138,7 @@ def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, socke
             if handled_exception:
                 connection_is_alive = False
                 handled_exception = False
+                processes_return_queue.put(winners_amount)
                 client_sock.close()
                 process_status.delete_connection()
 
@@ -137,6 +148,9 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+        self.accumulated_winners_amount= 0
+        self.dispatched_winners_processings = 0
+        self.completed_winners_processings = 0
 
     def run(self):
         """
@@ -150,28 +164,28 @@ class Server:
 
         file_writer_queue = mp.Queue()
         sockets_queue = mp.Queue(client_processes_amount)
+        processes_return_queue = mp.Queue()
 
-        self.connection_status = MainProcessStatus(0, self._server_socket, file_writer_queue, sockets_queue)
+        self.main_process_status = MainProcessStatus(0, self._server_socket, file_writer_queue, sockets_queue, processes_return_queue)
 
         writer_process = mp.Process( target = update_winners_file, args = [1, file_writer_queue])
         writer_process.start()
 
-        self.connection_status.add_children([writer_process])
+        self.main_process_status.add_children([writer_process])
 
         clients_processes = []
         for i in range(client_processes_amount):
-            client_process = mp.Process(target = handle_client_connection, args = [i + 2, file_writer_queue, sockets_queue])
+            client_process = mp.Process(target = handle_client_connection, args = [i + 2, file_writer_queue, sockets_queue, processes_return_queue])
             client_process.start()
             clients_processes.append(client_process)
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        self.connection_status.add_children(clients_processes)
+        self.main_process_status.add_children(clients_processes)
         while True:
-            sockets_queue.put(self.__accept_new_connection())
-            self.connection_status.delete_connection()
+            new_connection = self.__accept_new_connection()
+            sockets_queue.put(new_connection)
+            self.main_process_status.delete_connection()
             logging.info("[Process {}] Accepted new connection".format(0))
-
-        # TODO: cerrar cola de file process en sigterm
 
 
     def __accept_new_connection(self) -> ClientSocket:
@@ -185,8 +199,19 @@ class Server:
         # Connection arrived
         logging.info("Proceed to accept new connections")
         c, addr = self._server_socket.accept()
-        self.connection_status.add_connection(c)
+        self.main_process_status.add_connection(c)
         logging.info('Got connection from {}'.format(addr))
         return ClientSocket(c)
 
 
+    def __process_connection(socket: ClientSocket, sockets_queue, processes_return_queue):
+        connection_type = socket.read_connection_type()
+        if (connection_type == "evaluation"):
+            # Normal code execution
+            pass
+        elif (connection_type == "amount"):
+            # Count etc, new logic
+            pass
+        else:
+            # Send error
+            pass

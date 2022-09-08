@@ -87,7 +87,10 @@ class ClientSocket:
 		self.socket.sendall(constants.error_message_code.to_bytes(constants.message_code_bytes_amount, "big"))
 
 	def __read_message_code(self):
-		return int.from_bytes(self.__recv_all(constants.message_type_code_bytes_amount), "big")
+		return int.from_bytes(self.__recv_all(constants.message_code_bytes_amount), "big")
+
+	def __read_connection_type_code(self):
+		return int.from_bytes(self.__recv_all(constants.connection_type_bytes_amount), "big")
 
 	def __recv_all(self, bytes_amount: int):
 		total_received_bytes = b''
@@ -138,6 +141,15 @@ class ClientSocket:
 			self.__send_string(str(contestant.birthdate.date()))
 		self.socket.sendall(constants.last_participant_delimiter.to_bytes(constants.attributes_length_bytes_amount, "big"))
 
+
+	def read_connection_type(self):
+		connection_type = self.__read_connection_type_code()
+		if (connection_type == constants.contestants_evaluation_connection):
+			return "evaluation"
+		elif (connection_type == constants.winners_amount_connection):
+			return "amount"
+		else:
+			return None # Non expected code 
 
 	def send_error_message(self, message: str):
 		self.__send_error_message_code()
