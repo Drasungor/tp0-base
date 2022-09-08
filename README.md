@@ -64,8 +64,12 @@ Para resolver este ejercicio se desarrolló un script en python que genera el ar
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo debe ser inyectada al ejemplo y persistida afuera del mismo (hint: `docker volumes`).
 
+Para resolver este ejercicio se crearon en el archivo de docker compose volúmenes para los archivos config del cliente y del servidor, y además se generó un archivo .dockerignore, donde se agregaron los archivos de configuración. De esta forma se asegura que no van a existir los archivos en el container si no están localmente en el path especificado en el compose cada configuración del cliente y servidor.
+
 ### Ejercicio N°3:
 Crear un script que permita testear el correcto funcionamiento del servidor utilizando el comando `netcat`. Dado que el servidor es un EchoServer, se debe enviar un mensaje el servidor y esperar recibir el mismo mensaje enviado. Netcat no debe ser instalado en la máquina host y no se puede exponer puertos del servidor para realizar la comunicación (hint: `docker network`).
+
+Para resolver este ejercicio se creó un script en go que ejecuta un enviado del mensaje `my_message` llamando al comando de consola `echo my_message | nc -N server 12345`. Se pide luego el resultado de esta operación y se compara el mensaje resultante con el enviado, para corroborar que el server realmente es un echo server. Para utilizar netcat sin instalarlo localmente se creó otro servicio en el docker compose llamado nc, este descarga una imagen de golang para compilar y guardar el código del script descripto previamente, y luego baja una imagen de netcat para poder utilizarlo en el script. Una vez levantado el container se procede a llamar al script de comparación de input y resultado.
 
 ### Ejercicio N°4:
 Modificar el cliente y el servidor para que el programa termine de forma gracefully al recibir la signal SIGTERM. Terminar la aplicación de forma gracefully implica que todos los sockets y threads/procesos de la aplicación deben cerrarse/joinearse antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker-compose down`).
