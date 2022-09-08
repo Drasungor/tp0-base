@@ -20,6 +20,7 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 	DatasetPath   string
 	BatchSize     uint32
+	RequestAwait  uint32
 }
 
 // Client Entity that encapsulates how
@@ -113,6 +114,12 @@ func (c *Client) processBatch(batch_number *int, total_participants_amount *int,
 	*sent_participants_amount = current_sent_participants_amount
 	return !has_file_finished, nil
 	// should_keep_sending_participants = !has_file_finished
+}
+
+func ask_for_winners_amount(sync_channel chan bool, sleep_time uint32, connection_string string) {
+
+	
+	sync_channel <- true
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met

@@ -37,6 +37,7 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("log", "level")
 	v.BindEnv("dataset", "path")
 	v.BindEnv("batch", "size")
+	v.BindEnv("request", "await")
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -83,6 +84,7 @@ func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Log Level: %s", v.GetString("log.level"))
 	logrus.Infof("Dataset Path: %s", v.GetString("dataset.path"))
 	logrus.Infof("Batch Size: %s", v.GetString("batch.size"))
+	logrus.Infof("Request Await: %s", v.GetString("request.await"))
 }
 
 func main() {
@@ -105,6 +107,7 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 		DatasetPath:   v.GetString("dataset.path"),
 		BatchSize:     v.GetUint32("batch.size"),
+		RequestAwait:  v.GetUint32("request.await"),
 	}
 
 	client := common.NewClient(clientConfig)

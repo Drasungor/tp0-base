@@ -23,6 +23,7 @@ services:
       - CLI_LOG_LEVEL=DEBUG
       - CLI_DATASET_PATH=/datasets/dataset-1.csv
       - CLI_BATCH_SIZE=1000
+      - CLI_REQUEST_AWAIT=1
     networks:
       - testing_net
     depends_on:
@@ -39,6 +40,7 @@ services:
       - CLI_LOG_LEVEL=DEBUG
       - CLI_DATASET_PATH=/datasets/dataset-2.csv
       - CLI_BATCH_SIZE=1000
+      - CLI_REQUEST_AWAIT=1
     networks:
       - testing_net
     depends_on:

@@ -16,12 +16,20 @@ import (
 	// log "github.com/sirupsen/logrus"
 )
 
-const attributes_length_bytes_amount = 4
+const uint32_length = 4
+const bool_length = 1
+const attributes_length_bytes_amount = uint32_length
 const message_type_code_bytes_amount = 1
 const normal_message_code = 0
 const error_message_code = 1
 const last_participant_delimiter = 0xFFFFFFFF
-// const bool_bytes_amount = 1
+
+const connection_type_bytes_amount = 1
+const contestants_evaluation_connection = 0
+const winners_amount_connection = 1
+
+const is_final_answer = 1
+const connections_still_exist = 0
 
 
 type Participant struct {
@@ -40,6 +48,10 @@ type ParticipantsManager struct {
 
 func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
 	conn, err := net.Dial("tcp", config.ServerAddress)
+	if err != nil {
+		return nil, err
+	}
+	_, err = conn.Write([]byte{contestants_evaluation_connection})
 	if err != nil {
 		return nil, err
 	}
