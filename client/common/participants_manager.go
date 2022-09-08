@@ -4,18 +4,16 @@ import (
 	// "bufio"
 	"fmt"
 	"net"
-	"strings"
-
 	// "time"
 	"os"
-	// "os/signal"
-	// "syscall"
-	"bufio"
+    // "os/signal"
+    // "syscall"
 	"encoding/binary"
-	// "encoding/csv"
-	"errors"
 	"io"
+	"errors"
+	"encoding/csv"
 	// "golang.org/x/text/encoding/charmap"
+	// log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -36,8 +34,7 @@ type Participant struct {
 type ParticipantsManager struct {
 	conn   net.Conn
 	config ClientConfig
-	// fileReader *csv.Reader
-	fileReader *bufio.Scanner
+	fileReader *csv.Reader
 	file_ptr *os.File
 }
 
@@ -54,8 +51,7 @@ func NewParticipantsManager(config ClientConfig) (*ParticipantsManager, error) {
 	manager := &ParticipantsManager {
 		conn: conn,
 		config: config,
-		// fileReader: csv.NewReader(file),
-		fileReader: bufio.NewScanner(file),
+		fileReader: csv.NewReader(file),
 		file_ptr: file,
 	}
 	return manager, nil
@@ -118,28 +114,18 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 		return 0, false, err
 	}
 	read_lines_amount := 1
-	can_scanner_still_read := p.fileReader.Scan()
+	line_data, err := p.fileReader.Read()
 	file_has_finished := false
-
-	if !can_scanner_still_read {
-		err = p.fileReader.Err()
-		file_has_finished = err == nil
-	}
-	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil && !file_has_finished {
-		line_string := string(p.fileReader.Bytes())
-		line_data := strings.Split(line_string, ",")
+	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil {
 		for _, data := range line_data {
 			err = p.sendString(data)
+			// log.Infof("csv line : %v", data)
 			if err != nil {
 				return read_lines_amount, false, err
 			}
 		}
 		if (read_lines_amount < int(p.config.BatchSize)) {
-			can_scanner_still_read = p.fileReader.Scan()
-			if !can_scanner_still_read {
-				err = p.fileReader.Err()
-				file_has_finished = err == nil
-			}
+			line_data, err = p.fileReader.Read()
 		}
 		read_lines_amount++
 	}
