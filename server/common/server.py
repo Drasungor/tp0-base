@@ -139,7 +139,6 @@ def handle_client_connection(process_id: int, file_writer_queue: mp.Queue, socke
                 connection_is_alive = False
                 handled_exception = False
                 processes_return_queue.put(winners_amount)
-                logging.info("BORRAR HICE PUT EN LA COLA DE VALROES DE RETORNO")
                 client_sock.close()
                 process_status.delete_connection()
 
@@ -214,7 +213,6 @@ class Server:
                 try:
                     self.accumulated_winners_amount += processes_return_queue.get_nowait()
                     self.active_processes -= 1
-                    logging.info("BORRAR BAJE 1 A ACTIVE PROCESSES")
                 except queue.Empty:
                     is_queue_empty = True
             if (self.active_processes != 0):
