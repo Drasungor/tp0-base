@@ -116,9 +116,28 @@ func (c *Client) processBatch(batch_number *int, total_participants_amount *int,
 	// should_keep_sending_participants = !has_file_finished
 }
 
-func ask_for_winners_amount(sync_channel chan bool, sleep_time uint32, connection_string string) {
-
-	
+func ask_for_winners_amount(sync_channel chan bool, client_id string, sleep_time uint32, connection_string string) {
+	results_manager := NewResultManager(connection_string)
+	should_keep_iterating := true
+	for should_keep_iterating {
+		received_amount, is_final_value, err := results_manager.getWinnersAmount()
+		if err == nil {
+			should_keep_iterating = false
+			log.Infof("[CLIENT %v] Communication error in results manager thread: %v", client_id, err)
+		}
+		if is_final_value {
+			should_keep_iterating = false
+			log.Infof("[CLIENT %v] Total winners amount: %d", received_amount)
+		} else {
+			log.Infof("[CLIENT %v] Processing agencies left: %d", received_amount)
+			time.Sleep(time.Second * time.Duration(sleep_time))
+		}
+		select {
+		case <- sync_channel:
+			should_keep_iterating = false
+		default:
+		}
+	}
 	sync_channel <- true
 }
 
@@ -126,6 +145,7 @@ func ask_for_winners_amount(sync_channel chan bool, sleep_time uint32, connectio
 func (c *Client) StartClientLoop() {
 	// Create the connection the server in every loop iteration. Send an
 	// autoincremental msgID to identify every message sent
+	sync_channel := make(chan bool, 1)
 	signal_channel := make(chan os.Signal, 1)
 	signal.Notify(signal_channel, syscall.SIGTERM)
 
@@ -139,6 +159,7 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 	defer closeParticipantsManager(c)
+	go ask_for_winners_amount(sync_channel, c.config.ID, c.config.RequestAwait, c.config.ServerAddress)
 
 	batch_number := 1
 	total_participants_amount := 0
@@ -159,8 +180,11 @@ func (c *Client) StartClientLoop() {
 		// Process SIGTERM
 		select {
 		case <-signal_channel:
-			log.Infof("SIGTERM received")
+			log.Infof("[CLIENT %v] SIGTERM received", c.config.ID)
 			closeParticipantsManager(c)
+			sync_channel <- true
+			<- sync_channel
+			log.Infof("[CLIENT %v] Joined result getter thread", c.config.ID)
 			os.Exit(143)
 		default:
 		}

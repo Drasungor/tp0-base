@@ -19,7 +19,7 @@ func NewResultManager(connection_string string) *ResultManager {
 	}
 }
 
-func (r *ResultManager) getWinnersAmount() (uint32, bool, error) {
+func (r *ResultManager) getWinnersAmount() (uint32, bool, error) { // (WinnersAmount, true, nil) || (PendingClients, false, nil) || (0, false, err)
 	conn, err := net.Dial("tcp", r.connection_string)
 	defer conn.Close()
 	if err != nil {
