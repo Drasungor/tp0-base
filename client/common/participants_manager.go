@@ -16,7 +16,6 @@ import (
 	"errors"
 	"io"
 	// "golang.org/x/text/encoding/charmap"
-	log "github.com/sirupsen/logrus"
 )
 
 const attributes_length_bytes_amount = 4
@@ -119,7 +118,6 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 		return 0, false, err
 	}
 	read_lines_amount := 1
-	// line_data, err := p.fileReader.Read()
 	can_scanner_still_read := p.fileReader.Scan()
 	file_has_finished := false
 
@@ -129,19 +127,14 @@ func (p *ParticipantsManager) SendParticipants() (int, bool, error) { // (Partic
 	}
 	for (read_lines_amount <= int(p.config.BatchSize)) && err == nil && !file_has_finished {
 		line_string := string(p.fileReader.Bytes())
-
-		// log.Infof("LINE STRING: %v", line_string)
-
 		line_data := strings.Split(line_string, ",")
 		for _, data := range line_data {
 			err = p.sendString(data)
-			// log.Infof("csv line : %v", data)
 			if err != nil {
 				return read_lines_amount, false, err
 			}
 		}
 		if (read_lines_amount < int(p.config.BatchSize)) {
-			// line_data, err = p.fileReader.Read()
 			can_scanner_still_read = p.fileReader.Scan()
 			if !can_scanner_still_read {
 				err = p.fileReader.Err()
